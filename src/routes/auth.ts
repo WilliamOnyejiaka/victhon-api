@@ -1,0 +1,34 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import asyncHandler from "express-async-handler";
+import Authentication from "../controllers/Authentication";
+import { signUp, login, professionalSignUp } from "../middlewares/routes/auth";
+import passport from '../config/passport';
+
+const auth = Router();
+
+auth.post("/users/sign-up", signUp, asyncHandler(Authentication.signUp));
+auth.post("/users/login", login, asyncHandler(Authentication.login));
+
+auth.post("/professionals/sign-up", professionalSignUp, asyncHandler(Authentication.professionalSignUp));
+auth.post("/professionals/login", login, asyncHandler(Authentication.professionalLogin));
+
+auth.get('/google', (req: Request, res: Response, next: NextFunction) => {
+    const type = req.query.type || "user"; // default type
+
+    passport.authenticate('google', {
+        scope: ['profile', 'email'],
+        state: JSON.stringify({ type }),
+    })(req, res, next);
+});
+
+// auth.get('/google/callback', passport.authenticate('google'), asyncHandler(Authentication.googleAuth),
+//     (err: any, req: any, res: any, next: any) => {
+//         console.log(typeof err);
+
+//         console.error('OAuth Error:', err.oauthError || err);
+//         res.status(500).send('Authentication failed');
+//         return;
+//     }
+// );
+
+export default auth;

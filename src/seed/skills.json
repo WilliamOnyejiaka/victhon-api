@@ -1,0 +1,190 @@
+[
+  {
+    "skill": "Camera Operation",
+    "description": "Understanding how to use DSLR, mirrorless, and cinema cameras effectively."
+  },
+  {
+    "skill": "Manual Exposure Control",
+    "description": "Adjusting shutter speed, aperture, and ISO for proper exposure and creative control."
+  },
+  {
+    "skill": "Focus Techniques",
+    "description": "Using manual and autofocus modes for sharp and accurate focus."
+  },
+  {
+    "skill": "Composition",
+    "description": "Using rules like rule of thirds, symmetry, leading lines, and framing to create strong visuals."
+  },
+  {
+    "skill": "Lighting",
+    "description": "Understanding natural and artificial lighting to enhance image quality."
+  },
+  {
+    "skill": "Studio Lighting Setup",
+    "description": "Using softboxes, reflectors, strobes, and continuous light sources for controlled lighting."
+  },
+  {
+    "skill": "Color Theory",
+    "description": "Applying color choices to evoke emotion and maintain visual consistency."
+  },
+  {
+    "skill": "White Balance Control",
+    "description": "Balancing color temperatures to maintain accurate color tones."
+  },
+  {
+    "skill": "Lens Selection",
+    "description": "Choosing the right lens (wide-angle, telephoto, prime) for each situation."
+  },
+  {
+    "skill": "Shot Planning",
+    "description": "Visualizing and planning shots before capturing them."
+  },
+  {
+    "skill": "Storytelling Through Images",
+    "description": "Creating meaningful visual narratives that convey emotion and message."
+  },
+  {
+    "skill": "Portrait Photography",
+    "description": "Capturing expressive and flattering portraits of individuals or groups."
+  },
+  {
+    "skill": "Landscape Photography",
+    "description": "Capturing natural scenery using optimal composition and lighting."
+  },
+  {
+    "skill": "Product Photography",
+    "description": "Photographing products for ads, catalogs, and online platforms."
+  },
+  {
+    "skill": "Event Photography",
+    "description": "Covering weddings, parties, concerts, and corporate events effectively."
+  },
+  {
+    "skill": "Sports Photography",
+    "description": "Capturing high-speed action with perfect timing and focus."
+  },
+  {
+    "skill": "Wildlife Photography",
+    "description": "Photographing animals safely and without disturbing their environment."
+  },
+  {
+    "skill": "Aerial Photography",
+    "description": "Capturing overhead shots using drones."
+  },
+  {
+    "skill": "Cinematography",
+    "description": "Using camera movement, composition, and lighting to enhance visual storytelling."
+  },
+  {
+    "skill": "Shot Framing",
+    "description": "Selecting camera angles and framing to control focus and emotion."
+  },
+  {
+    "skill": "Camera Movement",
+    "description": "Using pans, tilts, sliders, and gimbals for cinematic motion."
+  },
+  {
+    "skill": "Video Exposure Control",
+    "description": "Managing shutter speed, ISO, aperture, ND filters, and frame rate for proper video exposure."
+  },
+  {
+    "skill": "Frame Rate Control",
+    "description": "Choosing frame rates for slow motion, cinematic, or standard playback."
+  },
+  {
+    "skill": "Sound Recording",
+    "description": "Using microphones, recorders, and boom mics to capture clear audio."
+  },
+  {
+    "skill": "Lighting for Video",
+    "description": "Building lighting setups suited for filmmaking and interviews."
+  },
+  {
+    "skill": "Scriptwriting",
+    "description": "Writing scripts for films, ads, and cinematic projects."
+  },
+  {
+    "skill": "Storyboarding",
+    "description": "Sketching shot sequences to visualize the final outcome."
+  },
+  {
+    "skill": "Video Editing",
+    "description": "Editing footage using software like Premiere Pro, DaVinci Resolve, or Final Cut."
+  },
+  {
+    "skill": "Color Grading",
+    "description": "Adjusting color tones and mood in video editing software."
+  },
+  {
+    "skill": "Color Correction",
+    "description": "Fixing exposure, white balance, and contrast issues in post-production."
+  },
+  {
+    "skill": "Sound Design",
+    "description": "Adding sound effects, background music, and audio layers to video."
+  },
+  {
+    "skill": "Motion Graphics",
+    "description": "Creating text animations and graphic elements in After Effects or similar software."
+  },
+  {
+    "skill": "Green Screen/Chroma Keying",
+    "description": "Filming and editing backgrounds using chroma key technology."
+  },
+  {
+    "skill": "Video Compression & Exporting",
+    "description": "Exporting video in correct formats, resolutions, and codecs."
+  },
+  {
+    "skill": "Drone Videography",
+    "description": "Shooting cinematic drone footage legally and safely."
+  },
+  {
+    "skill": "Time-lapse Photography",
+    "description": "Capturing time-based sequences for dramatic visual effects."
+  },
+  {
+    "skill": "Hyperlapse Videography",
+    "description": "Capturing extended motion sequences across long distances."
+  },
+  {
+    "skill": "360° Photography/Videography",
+    "description": "Producing immersive panoramic and VR content."
+  },
+  {
+    "skill": "Client Communication",
+    "description": "Understanding client needs and delivering according to expectations."
+  },
+  {
+    "skill": "Creative Direction",
+    "description": "Guiding models, actors, and scenes for artistic goals."
+  },
+  {
+    "skill": "Model Posing",
+    "description": "Directing people to pose naturally for photos and videos."
+  },
+  {
+    "skill": "Set Design",
+    "description": "Creating visual environments for shoots."
+  },
+  {
+    "skill": "Brand Content Creation",
+    "description": "Producing visual content for social media and marketing."
+  },
+  {
+    "skill": "File Management & Backup",
+    "description": "Organizing files, maintaining workflow, and archiving."
+  },
+  {
+    "skill": "Equipment Maintenance",
+    "description": "Maintaining cameras, lenses, and accessories for optimal use."
+  },
+  {
+    "skill": "Studio Management",
+    "description": "Operating and managing photography or video production studios."
+  },
+  {
+    "skill": "Creative Problem Solving",
+    "description": "Improvising solutions during shoots and edits."
+  }
+]

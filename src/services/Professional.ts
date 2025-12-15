@@ -1,0 +1,186 @@
+import { AppDataSource } from "../data-source";
+import { CdnFolders, HttpStatus, ResourceType } from "../types/constants";
+import Service from "./Service";
+import { Professional as ProfessionalEntity } from "../entities/Professional";
+import { EditProfessionalDto } from "../types";
+import emailValidator from "../validators/emailValidator";
+import Cloudinary from "./Cloudinary";
+import deleteFiles from "../utils/deleteFiles";
+
+export default class Professional extends Service {
+
+    private readonly repo = AppDataSource.getRepository(ProfessionalEntity);
+
+    public async profile(userId: string) {
+        try {
+            const userRepo = AppDataSource.getRepository(ProfessionalEntity);
+
+            let user = await userRepo.findOne({ where: { id: userId } });
+            if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
+            const coords = (user.location as any).replace("POINT(", "").replace(")", "").split(" ");
+
+            const data = {
+                ...user,
+                longitude: parseFloat(coords[0]),
+                latitude: parseFloat(coords[1]),
+                location: undefined,
+                password: undefined
+            };
+            return this.responseData(HttpStatus.OK, false, `User was retrieved successfully.`, data);
+
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    async editProfessionalProfile(
+        professionalId: string,
+        editData: EditProfessionalDto
+    ) {
+        try {
+            const professional = await this.repo.findOne({
+                where: { id: professionalId }
+            });
+
+            if (!professional) return this.responseData(404, true, "Professional not found");
+
+            /* ------------------ EMAIL VALIDATION ------------------ */
+            if (editData.email && editData.email !== professional.email) {
+                if (!emailValidator(editData.email)) {
+                    return this.responseData(400, true, "Invalid email");
+                }
+
+                const emailExists = await this.repo.findOne({
+                    where: { email: editData.email }
+                });
+
+                if (emailExists) return this.responseData(400, true, "Email already exists");
+            }
+
+            /* ------------------ PHONE VALIDATION ------------------ */
+            if (editData.phone && editData.phone !== professional.phone) {
+                const phoneExists = await this.repo.findOne({
+                    where: { phone: editData.phone }
+                });
+
+                if (phoneExists) return this.responseData(400, true, "Phone number already exists");
+            }
+
+            let profilePicture = professional.profilePicture;
+
+            if (editData.file) {
+                const cloudinary = new Cloudinary();
+
+                const { uploadedFiles, failedFiles } =
+                    await cloudinary.uploadV2(
+                        [editData.file],
+                        ResourceType.IMAGE,
+                        CdnFolders.PROFILEPICTURE
+                    );
+
+                if (failedFiles?.length) {
+                    return this.responseData(500, true, "Image upload failed", failedFiles);
+                }
+
+                profilePicture = {
+                    url: uploadedFiles[0]!.url,
+                    publicId: uploadedFiles[0]!.publicId
+                };
+
+                if (professional.profilePicture?.publicId) {
+                    await cloudinary.delete(professional.profilePicture.publicId);
+                }
+            }
+
+            let location = professional.location;
+
+            if (editData.longitude && editData.latitude) location = `POINT(${editData.longitude} ${editData.latitude})` as any;
+
+            const updatedData = {
+                firstName: editData.firstName?.trim() ?? professional.firstName,
+                lastName: editData.lastName?.trim() ?? professional.lastName,
+                email: editData.email ?? professional.email,
+                phone: editData.phone ?? professional.phone,
+                country: editData.country ?? professional.country,
+                state: editData.state ?? professional.state,
+                bio: editData.bio?.trim() ?? professional.bio,
+                skills: Array.isArray(editData.skills)
+                    ? editData.skills.slice(0, 20)
+                    : professional.skills,
+                baseCity: editData.baseCity ?? professional.baseCity,
+                currentAddress: editData.currentAddress ?? professional.currentAddress,
+                availability: editData.availability ?? professional.availability,
+                isActive: editData.isActive ?? professional.isActive,
+                profilePicture: profilePicture!,
+                location
+            };
+
+            await this.repo.update(professionalId, updatedData);
+
+            const updatedProfessional =
+                await this.repo.findOne({
+                    where: { id: professionalId }
+                });
+
+            return this.responseData(
+                200,
+                false,
+                "Profile updated successfully",
+                updatedProfessional
+            );
+
+        } catch (error) {
+            if (editData.file) {
+                await deleteFiles(editData.file);
+            }
+            return this.handleTypeormError(error);
+        }
+    }
+
+
+    // public async views(professionalId: string, page: number, limit: number) {
+    //     try {
+    //         const skip = (page - 1) * limit;
+    //         const viewRepo = AppDataSource.getRepository(ProfileView);
+
+    //         const [records, total] = await viewRepo.findAndCount({
+    //             where: { professionalId: professionalId },
+    //             relations: ['user'],
+    //             skip,
+    //             take: limit,
+    //             order: { updatedAt: "DESC" },
+    //         });
+
+    //         const data = {
+    //             records: records,
+    //             pagination: this.pagination(page, limit, total),
+    //         }
+
+    //         return this.responseData(200, false, "Views have been retrieved successfully", data)
+    //     } catch (error) {
+    //         return this.handleTypeormError(error);
+    //     }
+    // }
+
+    public async uploadProfilePicture(userId: string, publicId: string, url: string) {
+        try {
+
+            let user = await this.repo.findOneBy({ id: userId });
+            if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `User was not found.`);
+
+            if (user.profilePicture) return this.responseData(HttpStatus.BAD_REQUEST, true, `User already has a profile picture.`);
+
+            user.profilePicture = {
+                publicId,
+                url
+            };
+
+            await this.repo.save(user);
+
+            return this.responseData(HttpStatus.OK, false, `User was updated successfully.`, user);
+
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+}
