@@ -14,6 +14,8 @@ import auth from "../routes/auth";
 import user from "../routes/user";
 import professional from "../routes/professional";
 import account from "../routes/account";
+import schedule from "../routes/schedule";
+
 
 
 import verifyJWT from "../middlewares/verifyJWT";
@@ -59,7 +61,7 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     app.use("/api/v1/users", verifyJWT([UserType.USER]), user);
     app.use("/api/v1/professionals", verifyJWT([UserType.PROFESSIONAL]), professional);
     app.use("/api/v1/accounts", verifyJWT([UserType.PROFESSIONAL]), account);
-
+    app.use("/api/v1/schedules", schedule);
 
 
     app.post("/api/v1/test", async (req: Request, res: Response) => {

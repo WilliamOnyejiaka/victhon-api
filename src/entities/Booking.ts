@@ -1,0 +1,108 @@
+import {
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    ManyToOne,
+    JoinColumn,
+    CreateDateColumn,
+    UpdateDateColumn,
+    Index,
+    JoinTable,
+    ManyToMany, OneToMany,
+} from "typeorm";
+import { Geometry, User } from "./User";
+import { Professional } from "./Professional";
+import { UserType } from "../types/constants";
+import { ServiceEntity } from "./ServiceEntity";
+
+export enum BookingStatus {
+    PENDING = "pending",
+    ACCEPTED = "accepted",
+    REJECTED = "rejected",
+    COMPLETED = "completed",
+    CANCELLED = "cancelled",
+}
+
+export enum PaymentStatus {
+    PENDING = "pending",
+    PAID = "paid"
+}
+
+export enum ServiceType {
+    PHOTO = "photo",
+    VIDEO = "video",
+    BOTH = "both",
+}
+
+@Entity({ name: "bookings" })
+export class Booking {
+    @PrimaryGeneratedColumn("uuid")
+    id: string;
+
+    @Column({ nullable: true }) // because ON DELETE SET NULL
+    userId: string;
+
+    @ManyToOne(() => User, { onDelete: "SET NULL" })
+    user: User;
+
+    @Column()
+    professionalId: string;
+
+    @ManyToOne(() => Professional, { onDelete: "CASCADE" })
+    professional: Professional;
+
+    // @Column()
+    // @Index()
+    // packageId: string;
+
+    @ManyToMany(() => ServiceEntity, (v) => v.bookings)
+    @JoinTable() // owner side adds join table
+    services: ServiceEntity[];
+
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    address: string;
+
+    // @Column("geometry", {
+    //     spatialFeatureType: "Point",
+    //     srid: 4326,
+    // })
+    // @Index({ spatial: true })
+    // location: Geometry
+
+    @Column({ name: 'start_datetime', type: 'datetime', precision: 3 })
+    startDateTime!: Date;
+
+    @Column({ name: 'end_datetime', type: 'datetime', precision: 3 })
+    endDateTime!: Date;
+
+    @Column({
+        type: "enum",
+        enum: BookingStatus,
+        default: BookingStatus.PENDING,
+    })
+    status: BookingStatus;
+
+    @Column({
+        type: "enum",
+        enum: PaymentStatus,
+        default: PaymentStatus.PENDING,
+    })
+    paymentStatus: BookingStatus;
+
+    @Column({
+        type: "enum",
+        enum: UserType,
+    })
+    cancelledBy: UserType;
+
+    @Column({ type: 'decimal', precision: 10, scale: 2 })
+    amount: number;
+    @Column({ type: 'text' })
+    notes: string;
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
+}

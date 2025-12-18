@@ -14,13 +14,15 @@ import {
     OneToOne
 } from 'typeorm';
 import { Account } from "./Account";
+import { ProfessionalSchedule } from "./ProfessionalSchedule";
+import { RatingAggregate } from "./RatingAggregate";
+import { Review } from "./Review";
 // import { AuthProvider } from "./User";
 
 export enum AuthProvider {
     LOCAL = "local",
     GOOGLE = "google"
 }
-
 
 export interface PhotoField {
     url: string;
@@ -31,7 +33,6 @@ export interface Geometry {
     type: "Point"
     coordinates: [Number, Number]
 }
-
 
 @Entity('professionals')
 export class Professional {
@@ -97,8 +98,8 @@ export class Professional {
     @Column({ type: 'varchar', length: 100, nullable: true })
     currentAddress: string;
 
-    // @OneToMany(() => WorkGallery, (gallery) => gallery.profile, { cascade: true })
-    // gallery: WorkGallery[];
+    @OneToMany(() => ProfessionalSchedule, schedule => schedule.professional, { cascade: true })
+    schedules: ProfessionalSchedule[];
 
     // @OneToMany(() => Booking, booking => booking.professional, { cascade: true })
     // professionalBookings: Booking[];
@@ -109,11 +110,11 @@ export class Professional {
     // @OneToMany(() => Package, v => v.professional, { cascade: true })
     // package: Package[];
 
-    // @OneToMany(() => Review, review => review.professional, { cascade: true })
-    // reviews: Review[];
+    @OneToMany(() => Review, review => review.professional, { cascade: true })
+    reviews: Review[];
 
-    // @OneToOne(() => RatingAggregate, agg => agg.professional, { cascade: true })
-    // ratingAggregate: RatingAggregate;
+    @OneToOne(() => RatingAggregate, agg => agg.professional, { cascade: true })
+    ratingAggregate: RatingAggregate;
 
     // @OneToMany(() => Favorite, v => v.professional, { cascade: true })
     // favorites: Favorite[];

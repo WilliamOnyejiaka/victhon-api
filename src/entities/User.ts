@@ -12,6 +12,7 @@ import {
     JoinColumn,
     PrimaryGeneratedColumn
 } from 'typeorm';
+import { Review } from "./Review";
 
 export interface PhotoField {
     url: string;
@@ -64,6 +65,9 @@ export class User {
 
     @Column({ type: 'boolean', default: false })
     isVerified: boolean;
+
+    @OneToMany(() => Review, review => review.user, { cascade: true })
+    reviews: Review[];
 
     @CreateDateColumn()
     createdAt: Date;
