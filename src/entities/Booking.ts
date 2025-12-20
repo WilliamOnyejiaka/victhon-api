@@ -10,17 +10,17 @@ import {
     JoinTable,
     ManyToMany, OneToMany,
 } from "typeorm";
-import { Geometry, User } from "./User";
-import { Professional } from "./Professional";
-import { UserType } from "../types/constants";
-import { ServiceEntity } from "./ServiceEntity";
+import {Geometry, User} from "./User";
+import {Professional} from "./Professional";
+import {UserType} from "../types/constants";
+import {ServiceEntity} from "./ServiceEntity";
 
 export enum BookingStatus {
     PENDING = "pending",
     ACCEPTED = "accepted",
-    REJECTED = "rejected",
     COMPLETED = "completed",
     CANCELLED = "cancelled",
+    REJECTED = "rejected",
 }
 
 export enum PaymentStatus {
@@ -28,27 +28,21 @@ export enum PaymentStatus {
     PAID = "paid"
 }
 
-export enum ServiceType {
-    PHOTO = "photo",
-    VIDEO = "video",
-    BOTH = "both",
-}
-
-@Entity({ name: "bookings" })
+@Entity({name: "bookings"})
 export class Booking {
     @PrimaryGeneratedColumn("uuid")
     id: string;
 
-    @Column({ nullable: true }) // because ON DELETE SET NULL
+    @Column({nullable: true}) // because ON DELETE SET NULL
     userId: string;
 
-    @ManyToOne(() => User, { onDelete: "SET NULL" })
+    @ManyToOne(() => User, {onDelete: "SET NULL"})
     user: User;
 
     @Column()
     professionalId: string;
 
-    @ManyToOne(() => Professional, { onDelete: "CASCADE" })
+    @ManyToOne(() => Professional, {onDelete: "CASCADE"})
     professional: Professional;
 
     // @Column()
@@ -59,7 +53,7 @@ export class Booking {
     @JoinTable() // owner side adds join table
     services: ServiceEntity[];
 
-    @Column({ type: 'varchar', length: 100, nullable: true })
+    @Column({type: 'varchar', length: 100, nullable: true})
     address: string;
 
     // @Column("geometry", {
@@ -69,10 +63,10 @@ export class Booking {
     // @Index({ spatial: true })
     // location: Geometry
 
-    @Column({ name: 'start_datetime', type: 'datetime', precision: 3 })
+    @Column({name: 'start_datetime', type: 'datetime', precision: 3})
     startDateTime!: Date;
 
-    @Column({ name: 'end_datetime', type: 'datetime', precision: 3 })
+    @Column({name: 'end_datetime', type: 'datetime', precision: 3})
     endDateTime!: Date;
 
     @Column({
@@ -92,12 +86,14 @@ export class Booking {
     @Column({
         type: "enum",
         enum: UserType,
+        nullable: true
     })
     cancelledBy: UserType;
 
-    @Column({ type: 'decimal', precision: 10, scale: 2 })
+    @Column({type: 'decimal', precision: 10, scale: 2})
     amount: number;
-    @Column({ type: 'text' })
+
+    @Column({type: 'text', nullable: true })
     notes: string;
 
     @CreateDateColumn()

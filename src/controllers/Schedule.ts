@@ -12,7 +12,7 @@ export default class Schedule {
         const { dayOfWeek, startTime, endTime, isActive, validFrom, validUntil } = req.body;
 
 
-        const serviceResult = await Schedule.service.createSchedule(userId, dayOfWeek, startTime, endTime, isActive, validFrom, validUntil);
+        const serviceResult = await Schedule.service.createSchedule(userId, dayOfWeek, startTime, endTime, isActive, validFrom ?? null, validUntil ?? null);
         Controller.response(res, serviceResult);
     }
 

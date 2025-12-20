@@ -65,6 +65,16 @@ export type FailedFiles = {
 
 export type EventHandler<T> = (message: T, io: Server) => Promise<void> | void;
 
+export const exchange = 'victhon_exchange';
+
+export interface QueueConfig {
+    name: string;
+    durable: boolean;
+    routingKeyPattern: string;
+    exchange: string; // Dynamic exchange name for the queue
+    handlers: Record<string, EventHandler<any>>;
+}
+
 export interface WorkerConfig { connection: { url: string }, concurrency?: number, limiter?: { max: number, duration: number } }
 
 export interface IWorker<T> {

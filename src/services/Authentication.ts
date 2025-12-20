@@ -1,10 +1,10 @@
 import TokenBlackList from "../cache/TokenBlacklist";
-import env, { EnvKey } from "../config/env";
-import { AppDataSource } from "../data-source";
-import { Professional } from "../entities/Professional";
-import { User } from "../entities/User";
-import { FailedFiles, UploadedFiles } from "../types";
-import { CdnFolders, HttpStatus, ResourceType, UserType } from "../types/constants";
+import env, {EnvKey} from "../config/env";
+import {AppDataSource} from "../data-source";
+import {Professional} from "../entities/Professional";
+import {User} from "../entities/User";
+import {FailedFiles, UploadedFiles} from "../types";
+import {CdnFolders, HttpStatus, ResourceType, UserType} from "../types/constants";
 import deleteFiles from "../utils/deleteFiles";
 import Password from "../utils/Password";
 import Cloudinary from "./Cloudinary";
@@ -23,7 +23,7 @@ export default class Authentication extends Service {
     }
 
     protected generateOTPToken(email: string, role: string, expiresIn: string = "5m") {
-        return this.generateToken({ email: email }, role, expiresIn);
+        return this.generateToken({email: email}, role, expiresIn);
     }
 
     protected generateUserToken(data: any, role: UserType) {
@@ -93,13 +93,13 @@ export default class Authentication extends Service {
 
             const userRepo = AppDataSource.getRepository(User);
 
-            let userEmailExists = await userRepo.findOneBy({ email: signUpData.email });
+            let userEmailExists = await userRepo.findOneBy({email: signUpData.email});
             if (userEmailExists) {
                 if (signUpData.file) await deleteFiles(signUpData.file);
                 return this.responseData(400, true, `Email already exists.`);
             }
 
-            let userPhoneNumberExists = await userRepo.findOneBy({ phone: signUpData.phone });
+            let userPhoneNumberExists = await userRepo.findOneBy({phone: signUpData.phone});
             if (userPhoneNumberExists) {
                 if (signUpData.file) await deleteFiles(signUpData.file);
                 return this.responseData(400, true, `Phone number already exists.`);
@@ -113,7 +113,7 @@ export default class Authentication extends Service {
 
             const savedUser: any = (await userRepo.save(user));
 
-            const token = this.generateUserToken({ id: savedUser.id, userType: UserType.USER }, UserType.USER);
+            const token = this.generateUserToken({id: savedUser.id, userType: UserType.USER}, UserType.USER);
             const data = {
                 user: {
                     ...savedUser,
@@ -135,7 +135,11 @@ export default class Authentication extends Service {
         try {
             const userRepo = AppDataSource.getRepository(User);
 
-            let result = await userRepo.findOneBy({ email: email });
+            let result = await userRepo
+                .createQueryBuilder("user")
+                .addSelect("user.password")
+                .where("user.email = :email", { email })
+                .getOne();
 
             if (result) {
                 const user = result;
@@ -143,7 +147,7 @@ export default class Authentication extends Service {
                 const validPassword = Password.compare(password, hashedPassword, this.storedSalt);
 
                 if (validPassword) {
-                    const token = this.generateUserToken({ id: user.id, userType: UserType.USER }, UserType.USER);
+                    const token = this.generateUserToken({id: user.id, userType: UserType.USER}, UserType.USER);
 
                     const data = {
                         user: {
@@ -166,7 +170,7 @@ export default class Authentication extends Service {
         try {
             const professionalRepo = AppDataSource.getRepository(Professional);
 
-            let userEmailExists = await professionalRepo.findOneBy({ email: email });
+            let userEmailExists = await professionalRepo.findOneBy({email: email});
             if (userEmailExists) {
                 return this.responseData(400, true, `Email already exists.`);
             }
@@ -249,7 +253,11 @@ export default class Authentication extends Service {
         try {
             const professionalRepo = AppDataSource.getRepository(Professional);
 
-            let result = await professionalRepo.findOne({ where: { email: email } });
+            let result = await professionalRepo
+                .createQueryBuilder("professional")
+                .addSelect("professional.password")
+                .where("professional.email = :email", {email})
+                .getOne();
 
             if (result) {
                 const user = result;

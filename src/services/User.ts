@@ -1,10 +1,28 @@
 import { AppDataSource } from "../data-source";
-import { HttpStatus } from "../types/constants";
+import {HttpStatus, UserType} from "../types/constants";
 import Service from "./Service";
 import { User as UserEntity } from "../entities/User";
+import UserCache from "../cache/UserCache";
+import UserSocket from "../cache/UserSocket";
 
 
 export default class User extends Service {
+    private readonly socketCache = new UserSocket();
+    private readonly userCache: UserCache = new UserCache(UserType.USER);
+
+    public async setSocketId(userId: string, socketId: string) {
+        return await this.socketCache.set(UserType.USER, userId, socketId);
+    }
+
+    public async deleteSocketId(userId: string) {
+        return await this.socketCache.delete(UserType.USER, userId);
+    }
+
+    public async getSocketId(userId: string) {
+        return await this.socketCache.get(UserType.USER, userId);
+    }
+
+
 
     public async profile(userId: string) {
         try {

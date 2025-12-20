@@ -1,4 +1,4 @@
-import { config } from "dotenv";
+import {config} from "dotenv";
 
 config();
 
@@ -22,7 +22,9 @@ export enum EnvKey {
     CLOUDINARY_API_KEY = 'cloudinaryApiKey',
     CLOUDINARY_API_SECRET = 'cloudinaryApiSecret',
     MAIN_API = 'mainApi',
-    BATCH_SIZE = 'batchSize'
+    BATCH_SIZE = 'batchSize',
+    RABBIT_MQ = 'rabbitMQ',
+
 }
 
 export default function env(key: EnvKey): string | undefined {
@@ -46,7 +48,8 @@ export default function env(key: EnvKey): string | undefined {
         [EnvKey.CLOUDINARY_API_KEY]: process.env.CLOUDINARY_API_KEY,
         [EnvKey.CLOUDINARY_API_SECRET]: process.env.CLOUDINARY_API_SECRET,
         [EnvKey.MAIN_API]: process.env.MAIN_API,
-        [EnvKey.BATCH_SIZE]: process.env.BATCH_SIZE
+        [EnvKey.BATCH_SIZE]: process.env.BATCH_SIZE,
+        [EnvKey.RABBIT_MQ]: process.env.RABBITMQ_URL!
     };
     return envValues[key];
 }

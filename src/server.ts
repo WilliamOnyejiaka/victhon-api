@@ -7,6 +7,8 @@ import redisClient from "./config/redis";
 import createApp from "./config/app";
 import { Worker } from "bullmq";
 import { IWorker, WorkerConfig } from "./types";
+import {RabbitMQ} from "./services/RabbitMQ";
+import {QueueName, QUEUES} from "./config/queues";
 // import { Notification } from "./queues/NotificationQueue";
 // import { NewBooking } from "./queues/NewBooking";
 // import { UpdateRatingAgg } from "./queues/UpdateRatingAgg";
@@ -44,11 +46,17 @@ const PORT = env(EnvKey.PORT)!;
         const subClient: RedisClientType = pubClient.duplicate();
         await Promise.all([pubClient.connect(), subClient.connect()]);
 
+
+        await RabbitMQ.connect();
+
+
         await AppDataSource.initialize()
             .then(() => console.log("✅ DB has connected successfully"))
             .catch(console.error);
 
         const { server: app, io } = await createApp(pubClient, subClient);
+
+        for (const queueName of Object.keys(QUEUES) as QueueName[]) RabbitMQ.startConsumer(queueName, io); //! Add try catch
 
         // const workerConfig: WorkerConfig = { connection: { url: env(EnvKey.REDIS_URL)! } };
 

@@ -1,4 +1,3 @@
-
 export enum UserType {
     Admin = "admin",
     USER = "user",
@@ -14,12 +13,10 @@ export enum Events {
     APP_ERROR = "appError",
     ONLINE_PRESENCE = "onlinePresence"
 }
+
 export enum Namespaces {
-    CHAT = '/chat',
-    PRESENCE = '/presence',
     NOTIFICATION = '/notification',
     BASE = '/api/v1/socket',
-    SUPPORTCHAT = '/supportChat'
 }
 
 
@@ -208,7 +205,7 @@ export const HttpStatusMessage: Record<HttpStatus, string> = {
 };
 
 export function imageFolders(key: string) {
-    const basePath = "mecfur-cdn";
+    const basePath = "victhon-cdn";
     const profilePicture = `${basePath}/profile-picture`;
 
     return {
@@ -220,6 +217,33 @@ export function imageFolders(key: string) {
 export enum QueueType {
     NOTIFICATION = 'notification-queue',
     POST_JOB = "post-job-queue",
+    NEW_BOOKING = 'new-booking-queue',
+    NEW_VIEW = 'new-view-queue',
+    UPDATE_RATING_AGG = 'update-rating-agg-queue',
+    NOTIFICATION_SCHEDULAR = 'notification-schedular-queue'
+}
+
+export enum QueueNames {
+    USER = "victhon_user_queue",
+    NOTIFICATION = "victhon_notification_queue"
+}
+
+export enum QueueEvents {
+    USER_UPDATE = "",
+    NOTIFICATION_NOTIFY = "notification.notify",
+    USER_LIKE = "user.like",
+    USER_VISIT = "user.visit",
+    NOTIFICATION_OFFLINE = "notification.offline",
+    ADMIN_NOTIFICATION = "notification.notify_admin",
+    ADMIN_NOTIFICATION_OFFLINE = "notification.offline_admin",
+    MASS_EMAIL = "notification.mass_email",
+    SIGN_UP_EMAIL = "notification.sign_up_email"
+
+};
+
+
+export enum JobType {
+    OFFLINE_NOTIFICATION = 'offline-notification-queue',
     NEW_BOOKING = 'new-booking-queue',
     NEW_VIEW = 'new-view-queue',
     UPDATE_RATING_AGG = 'update-rating-agg-queue',
