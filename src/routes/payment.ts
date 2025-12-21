@@ -6,6 +6,8 @@ import { initializeValidator } from "./../middlewares/routes/payment";
 const paymentRouter = Router();
 
 paymentRouter.get('/initialize/booking/:bookingId', initializeValidator, asyncHandler(Controller.initializeBookingPayment));
+paymentRouter.get('/initialize/booking/refund/:bookingId', initializeValidator, asyncHandler(Controller.bookingRefund));
+
 // paymentRouter.get('/booking/verify/:bookingId', initializeValidator, asyncHandler(verifyBookingTransaction));
 paymentRouter.post('/webhook', express.raw({ type: 'application/json' }), asyncHandler(Controller.webhook));
 

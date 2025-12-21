@@ -1,23 +1,32 @@
-import { Request, Response } from "express";
+import {Request, Response} from "express";
 import Service from "../services/Payment";
-import { UserType } from "../types/constants";
+import {UserType} from "../types/constants";
 import Controller from "./Controller";
 
-export default class Payment  {
+export default class Payment {
 
     private static service: Service = new Service();
 
-    public static async initializeBookingPayment (req: Request, res: Response) {
-        const { id: userId } = res.locals.data;
+    public static async initializeBookingPayment(req: Request, res: Response) {
+        const {id: userId} = res.locals.data;
 
-        const { bookingId } = req.params;
+        const {bookingId} = req.params;
 
         const serviceResult = await Payment.service.initializeBookingPayment(bookingId!, userId);
         Controller.response(res, serviceResult);
     }
 
+    public static async bookingRefund(req: Request, res: Response) {
+        const {id: userId} = res.locals.data;
 
-    public static async webhook (req: Request, res:Response) {
+        const {bookingId} = req.params;
+
+        const serviceResult = await Payment.service.refundTransaction(bookingId!, userId);
+        Controller.response(res, serviceResult);
+    }
+
+
+    public static async webhook(req: Request, res: Response) {
 
         const signature = req.headers['x-paystack-signature'];
 

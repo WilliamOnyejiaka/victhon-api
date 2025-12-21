@@ -15,6 +15,7 @@ export enum TransactionType {
     WITHDRAWAL = "withdrawal",
     BOOKING_DEPOSIT = "booking_deposit",
     ESCROW_RELEASE = "escrow_release",
+    REFUND = "refund",
 }
 
 export enum TransactionStatus {
