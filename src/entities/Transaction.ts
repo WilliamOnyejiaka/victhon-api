@@ -8,6 +8,7 @@ import {
 import {User} from "./User";
 import {Professional} from "./Professional";
 import {Escrow} from "./Escrow";
+import {Wallet} from "./Wallet";
 
 export enum TransactionType {
     DEPOSIT = "deposit",
@@ -65,6 +66,16 @@ export class Transaction {
 
     @Column({ nullable: true })
     escrowId?: string;
+
+    @ManyToOne(() => Wallet, (wallet) => wallet.transactions, {
+        nullable: true,
+        onDelete: "SET NULL",
+    })
+    @JoinColumn()
+    wallet?: Wallet;
+
+    @Column({ nullable: true })
+    walletId?: string;
 
     // Paystack reference
     @Column({nullable: true})

@@ -20,18 +20,26 @@ export default class Payment extends BaseService {
 
     private readonly PAYSTACK_SECRET_KEY = env(EnvKey.PAYSTACK_SECRET_KEY)!;
 
-
     public async initializeBookingPayment(bookingId: string, userId: string) {
         try {
             const booking = await this.bookingRepo.findOne({
                 where: {id: bookingId, userId: userId},
-                relations: ["escrow", "user"]
+                relations: ["escrow", "user", "professional.wallet"]
             });
 
             if (!booking) return this.responseData(404, true, "Booking was not found");
-            // if (booking.status !== BookingStatus.ACCEPTED) return this.responseData(400, true, "Booking has not yet been accepted");
-
+            if (booking.status !== BookingStatus.ACCEPTED) return this.responseData(400, true, "Booking has not yet been accepted");
             if (booking.escrow.status !== EscrowStatus.PENDING) return this.responseData(400, true, "Cannot pay for this booking");
+
+            let wallet = booking.professional.wallet;
+            if (!wallet) {
+                wallet = await this.walletRepo.save(this.walletRepo.create({
+                    professionalId: booking.professionalId,
+                    balance: 0,
+                    pendingAmount: 0,
+                    totalBalance: 0,
+                }));
+            }
 
             const existingTx = await this.transactionRepo.findOne({
                 where: {
@@ -53,6 +61,7 @@ export default class Payment extends BaseService {
                 amount: booking.escrow.amount,
                 escrowId: booking.escrow.id,
                 status: TransactionStatus.FAILED,
+                walletId: wallet.id,
             });
 
             await this.transactionRepo.save(transaction);
@@ -108,7 +117,7 @@ export default class Payment extends BaseService {
                 // Fetch transaction with relations using the transactional manager
                 const payment = await manager.findOne(Transaction, {
                     where: {id: transactionId},
-                    relations: ["escrow", "escrow.booking", "escrow.booking.professional"],
+                    relations: ["escrow", "escrow.booking", "escrow.booking.professional", "escrow.booking.professional.wallet"],
                 });
 
                 if (!payment) {
@@ -140,18 +149,13 @@ export default class Payment extends BaseService {
                     );
 
                     // Find or create professional's wallet
-                    let wallet = await manager.findOne(Wallet, {
+                    const wallet = await manager.findOne(Wallet, {
                         where: {professionalId: escrow.booking.professionalId},
                     });
 
                     if (!wallet) {
-                        wallet = manager.create(Wallet, {
-                            professionalId: escrow.booking.professionalId,
-                            balance: 0,
-                            pendingAmount: 0,
-                            totalBalance: 0,
-                        });
-                        await manager.save(Wallet, wallet);
+                        logger.error(`Wallet not found for transactionId: ${transactionId}`);
+                        throw new Error("Wallet not found"); // Will trigger rollback
                     }
 
                     const newPendingAmount: number = Number(wallet.pendingAmount) + Number(escrow.amount);
@@ -185,67 +189,6 @@ export default class Payment extends BaseService {
         } catch (error) {
             // Any error inside the transaction automatically rolls back
             logger.error(`Payment processing failed for transactionId: ${eventData.metadata?.transactionId}`, error);
-            return this.handleTypeormError(error);
-        }
-    }
-
-    public async successfulChargea(eventData: any) {
-        try {
-            const {transactionId} = eventData.metadata;
-            const payment = await this.transactionRepo.findOne({
-                where: {id: transactionId}, relations: ["escrow", "escrow.booking", "escrow.booking.professional"],
-            });
-
-            if (!payment) {
-                logger.error("Payment was not found" + transactionId);
-                return;
-            }
-
-            // Prevent double-processing (idempotency)
-            if (payment.status === TransactionStatus.SUCCESS) {
-                logger.info(`Payment already processed: ${transactionId}`);
-                // await queryRunner.rollbackTransaction();
-                return;
-            }
-
-            await this.transactionRepo.update(
-                {id: transactionId},
-                {
-                    status: TransactionStatus.SUCCESS,
-                }
-            );
-
-            if (payment.type === TransactionType.BOOKING_DEPOSIT) {
-                const escrow = payment.escrow!;
-
-                // Update escrow status
-                await this.escrowRepo.update(
-                    {id: escrow.id},
-                    {status: EscrowStatus.PAID}
-                );
-
-                // Fetch wallet of professional
-                const wallet = await this.walletRepo.findOne({
-                    where: {professionalId: escrow.booking.professionalId},
-                });
-
-                if (wallet) {
-                    const newPendingAmount = wallet.pendingAmount + Number(escrow.amount);
-                    const newTotalBalance = wallet.balance + newPendingAmount;
-
-                    await this.walletRepo.update(
-                        {id: wallet.id},
-                        {
-                            pendingAmount: newPendingAmount,
-                            totalBalance: newTotalBalance,
-                        }
-                    );
-                }
-            }
-
-            logger.info(`🤑 Payment was successful for transaction:${transactionId}`);
-        } catch (error) {
-            logger.error(error);
             return this.handleTypeormError(error);
         }
     }
@@ -285,6 +228,13 @@ export default class Payment extends BaseService {
             case 'subscription.create':
             case 'invoice.payment_failed':
                 // Handle recurring payments
+                break;
+            case "transfer.success":
+                // await handleTransferSuccess(event.data);
+                break;
+
+            case "transfer.failed":
+                // await handleTransferFailed(event.data);
                 break;
 
             default:
@@ -340,6 +290,27 @@ export default class Payment extends BaseService {
             return this.handleTypeormError(error);
         }
     }
+
+    // public async withdraw(userId: string, amount: number) {
+    //     try {
+    //         const response = await axios.post(
+    //             'https://api.paystack.co/transferrecipient',
+    //             {
+    //                 name: string,
+    //                 account_number: string;
+    //                 bank_code: string;
+    //             },
+    //             {
+    //                 headers: {
+    //                     Authorization: `Bearer ${this.PAYSTACK_SECRET_KEY}`,
+    //                     'Content-Type': 'application/json'
+    //                 }
+    //             }
+    //         );
+    //     } catch (error) {
+    //
+    //     }
+    // }
 
     async verifyBookingTransaction(bookingId: string, userId: string) {
         try {

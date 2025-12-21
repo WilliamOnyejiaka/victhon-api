@@ -19,6 +19,7 @@ export enum NotificationType {
     REJECTED_BOOKING = "rejectedBooking",
     VIEW_PROFILE = "viewProfile",
     BOOKING_PAYMENT = "bookingPayment",
+    ESCROW_RELEASE = "escrow_release",
 }
 
 export enum NotificationStatus {

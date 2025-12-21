@@ -227,6 +227,7 @@ export enum QueueNames {
     USER = "victhon_user_queue",
     NOTIFICATION = "victhon_notification_queue",
     PAYMENT = "victhon_payment_queue",
+    WALLET = "victhon_wallet_queue",
 }
 
 export enum QueueEvents {
@@ -241,6 +242,7 @@ export enum QueueEvents {
     SIGN_UP_EMAIL = "notification.sign_up_email",
     PAYMENT_CHARGE_SUCCESSFUL = "payment.charge_successful",
     PAYMENT_BOOK_SUCCESSFUL = "payment.book_successful",
+    WALLET_ESCROW_RELEASE = "wallet.escrow_release",
 };
 
 

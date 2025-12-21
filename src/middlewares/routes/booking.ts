@@ -67,6 +67,13 @@ export const acceptBooking = [
 ];
 
 export const rejectBooking = [...acceptBooking];
+export const completeBooking = [
+    verifyJWT([UserType.USER]),
+    param("bookingId")
+        .notEmpty().withMessage("bookingId is required")
+        .isUUID().withMessage("bookingId must be a valid UUID"),
+    handleValidationErrors
+];
 
 export const getProBooking = [
     verifyJWT([UserType.PROFESSIONAL]),

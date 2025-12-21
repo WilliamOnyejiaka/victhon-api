@@ -3,7 +3,7 @@ import asyncHandler from "express-async-handler";
 import Controller from "../controllers/Booking";
 import {
     acceptBooking,
-    bookings,
+    bookings, completeBooking,
     createBooking,
     getProBooking,
     getUserBooking,
@@ -27,6 +27,8 @@ booking.get("/schedules/:professionalId", bookings, asyncHandler(Controller.book
 booking.post("/", createBooking, asyncHandler(Controller.book));
 booking.patch("/accept/:bookingId", acceptBooking, asyncHandler(Controller.acceptBooking));
 booking.patch("/reject/:bookingId", rejectBooking, asyncHandler(Controller.rejectBooking));
+booking.patch("/complete/:bookingId", completeBooking, asyncHandler(Controller.completeBooking));
+
 
 
 // booking.post("/schedule", asyncHandler(Controller.createSchedule));

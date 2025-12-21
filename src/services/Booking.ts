@@ -4,15 +4,12 @@ import {In, IsNull, LessThanOrEqual, MoreThanOrEqual, Not, Or,} from 'typeorm';
 import {DayOfWeek, ProfessionalSchedule} from '../entities/ProfessionalSchedule';
 import Service from './Service';
 import {ServiceEntity} from '../entities/ServiceEntity';
-import {HttpStatus, UserType} from '../types/constants';
+import {HttpStatus, QueueEvents, QueueNames, UserType} from '../types/constants';
 import {Professional} from "../entities/Professional";
-import logger from "../config/logger";
 import notify from "./notify";
 import {NotificationType} from "../entities/Notification";
 import {Escrow, EscrowStatus} from "../entities/Escrow";
-// import notify from "./notify";
-// import { NotificationType } from "../entities/Notification";
-// import { Queues } from '../config/bullMQ';
+import {RabbitMQ} from "./RabbitMQ";
 
 
 export default class BookingService extends Service {
@@ -60,7 +57,7 @@ export default class BookingService extends Service {
                 const existingBookings = await manager.find(Booking, {
                     where: {
                         professionalId,
-                        status: Not(In([BookingStatus.CANCELLED])),
+                        status: Not(In([BookingStatus.CANCELLED, BookingStatus.COMPLETED, BookingStatus.REJECTED])),
                         startDateTime: LessThanOrEqual(endDateTime),
                         endDateTime: MoreThanOrEqual(startDateTime),
                     },
@@ -334,6 +331,60 @@ export default class BookingService extends Service {
         }
     }
 
+    public async completeBooking(bookingId: string, userId: string) {
+        try {
+            const result = await AppDataSource.transaction(async manager => {
+                const booking = await manager.findOne(Booking, {
+                    where: {id: bookingId, userId},
+                    relations: {
+                        escrow: true,
+                        professional: {wallet: true},
+                    },
+                    lock: {mode: "pessimistic_write"},
+                });
+
+                if (!booking) {
+                    throw new Error("Booking not found");
+                }
+
+                if (booking.status !== BookingStatus.ACCEPTED) {
+                    throw new Error("Booking cannot be completed");
+                }
+
+                if (booking.escrow.status !== EscrowStatus.PAID) {
+                    throw new Error("Booking cannot be completed, no payment made");
+                }
+
+                booking.status = BookingStatus.COMPLETED;
+                booking.escrow.status = EscrowStatus.RELEASED;
+
+
+                return await manager.save(booking)
+            });
+
+            const payload = {
+                escrowId: result.escrow.id,
+                professionalId: result.professionalId,
+                walletId: result.professional.wallet.id,
+            };
+            const queueName = QueueNames.WALLET;
+            const eventType = QueueEvents.WALLET_ESCROW_RELEASE
+            await RabbitMQ.publishToExchange(queueName, eventType, {
+                eventType: eventType,
+                payload,
+            });
+
+            return this.responseData(
+                200,
+                false,
+                "Booking completed successfully",
+                result,
+            );
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
     public async getProBookings(proId: string, page: number, limit: number) {
         try {
             const skip = (page - 1) * limit;
@@ -343,7 +394,7 @@ export default class BookingService extends Service {
                 skip,
                 take: limit,
                 order: {createdAt: "DESC"}, // sort newest first
-                relations: ["user"], // optional: include related data
+                relations: ["user"],
             });
 
             const data = {

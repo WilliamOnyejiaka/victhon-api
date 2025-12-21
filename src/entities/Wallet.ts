@@ -6,9 +6,10 @@ import {
     JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
-    Unique,
+    Unique, OneToMany,
 } from "typeorm";
 import {Professional} from "./Professional";
+import {Transaction} from "./Transaction";
 
 @Entity("wallets")
 @Unique(["professionalId"])
@@ -29,20 +30,24 @@ export class Wallet {
     /**
      * Available balance (kobo)
      */
-    @Column("bigint", {default: 0})
+    @Column("decimal", {precision: 12, scale: 2})
     balance: number;
 
     /**
      * Funds on hold / in escrow (kobo)
      */
-    @Column("bigint", {default: 0})
+    @Column("decimal", {precision: 12, scale: 2})
     pendingAmount: number;
 
     /**
      * balance + pendingAmount (derived, stored for fast reads)
      */
-    @Column("bigint", {default: 0})
+    @Column("decimal", {precision: 12, scale: 2})
     totalBalance: number;
+
+    // ✅ ONE escrow → MANY transactions
+    @OneToMany(() => Transaction, (transaction) => transaction.wallet)
+    transactions: Transaction[];
 
     @CreateDateColumn()
     createdAt: Date;
