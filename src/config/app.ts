@@ -18,6 +18,8 @@ import schedule from "../routes/schedule";
 import booking from "../routes/booking";
 import service from "../routes/service";
 import review from "../routes/review";
+import payment from "../routes/payment";
+
 
 
 import verifyJWT from "../middlewares/verifyJWT";
@@ -33,6 +35,17 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     const stream = {write: (message: string) => logger.http(message.trim())};
     const server = http.createServer(app);
     const io = await initializeIO(server, pubClient, subClient);
+
+    app.use(
+        '/api/v1/payments/webhook',
+        express.json({
+            verify: (req, res, buf) => {
+                (req as any).rawBody = buf;
+            }
+        })
+    );
+
+
 
     app.use(helmet());
     app.set('trust proxy', 1); // For a single proxy (e.g., Render)
@@ -67,6 +80,8 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     app.use("/api/v1/bookings", booking);
     app.use("/api/v1/services", service);
     app.use("/api/v1/reviews", review);
+    app.use("/api/v1/payments", payment);
+
 
 
     app.post("/api/v1/test", async (req: Request, res: Response) => {

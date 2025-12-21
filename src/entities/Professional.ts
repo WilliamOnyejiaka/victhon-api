@@ -13,10 +13,13 @@ import {
     PrimaryGeneratedColumn,
     OneToOne
 } from 'typeorm';
-import { Account } from "./Account";
-import { ProfessionalSchedule } from "./ProfessionalSchedule";
-import { RatingAggregate } from "./RatingAggregate";
-import { Review } from "./Review";
+import {Account} from "./Account";
+import {ProfessionalSchedule} from "./ProfessionalSchedule";
+import {RatingAggregate} from "./RatingAggregate";
+import {Review} from "./Review";
+import {Transaction} from "./Transaction";
+import {Wallet} from "./Wallet";
+
 // import { AuthProvider } from "./User";
 
 export enum AuthProvider {
@@ -39,34 +42,34 @@ export class Professional {
     @PrimaryGeneratedColumn("uuid")
     id: string;
 
-    @Column({ type: 'varchar', length: 50, unique: true })
+    @Column({type: 'varchar', length: 50, unique: true})
     email: string;
 
-    @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
+    @Column({type: 'varchar', length: 20, unique: true, nullable: true})
     phone: string;
 
-    @Column({ type: 'text', select: false  })
+    @Column({type: 'text', select: false})
     password: string;
 
-    @Column({ type: 'varchar', length: 50, nullable: true })
+    @Column({type: 'varchar', length: 50, nullable: true})
     firstName: string;
 
-    @Column({ type: 'varchar', length: 50, nullable: true })
+    @Column({type: 'varchar', length: 50, nullable: true})
     lastName: string;
 
-    @Column({ type: 'varchar', length: 50, nullable: true })
+    @Column({type: 'varchar', length: 50, nullable: true})
     country: string;
 
-    @Column({ type: 'varchar', length: 80, nullable: true })
+    @Column({type: 'varchar', length: 80, nullable: true})
     state: string;
 
-    @Column({ type: 'json', nullable: true })
+    @Column({type: 'json', nullable: true})
     profilePicture?: PhotoField;
 
-    @Column({ type: 'varchar', length: 100, nullable: true })
+    @Column({type: 'varchar', length: 100, nullable: true})
     bio: string;
 
-    @Column({ type: "json", nullable: true })
+    @Column({type: "json", nullable: true})
     skills: string[];
 
     @Column({
@@ -80,41 +83,51 @@ export class Professional {
         spatialFeatureType: "Point",
         srid: 4326
     })
-    @Index({ spatial: true })
+    @Index({spatial: true})
     location: Geometry
 
-    @Column({ type: 'boolean', default: true })
+    @Column({type: 'boolean', default: true})
     isActive: boolean;
 
-    @Column({ type: 'boolean', default: false })
+    @Column({type: 'boolean', default: false})
     isVerified: boolean;
 
-    @Column({ type: 'boolean', default: true })
+    @Column({type: 'boolean', default: true})
     availability: boolean;
 
-    @Column({ type: 'varchar', length: 100, nullable: true })
+    @Column({type: 'varchar', length: 100, nullable: true})
     baseCity: string;
 
-    @Column({ type: 'varchar', length: 100, nullable: true })
+    @Column({type: 'varchar', length: 100, nullable: true})
     currentAddress: string;
 
-    @OneToMany(() => ProfessionalSchedule, schedule => schedule.professional, { cascade: true })
+    @OneToMany(() => ProfessionalSchedule, schedule => schedule.professional, {cascade: true})
     schedules: ProfessionalSchedule[];
 
     // @OneToMany(() => Booking, booking => booking.professional, { cascade: true })
     // professionalBookings: Booking[];
 
-    @OneToMany(() => Account, account => account.professional, { cascade: true })
+    @OneToMany(() => Account, account => account.professional, {cascade: true})
     account: Account[];
 
     // @OneToMany(() => Package, v => v.professional, { cascade: true })
     // package: Package[];
 
-    @OneToMany(() => Review, review => review.professional, { cascade: true })
+    @OneToMany(() => Review, review => review.professional, {cascade: true})
     reviews: Review[];
 
-    @OneToOne(() => RatingAggregate, agg => agg.professional, { cascade: true })
+    @OneToOne(() => RatingAggregate, agg => agg.professional, {cascade: true})
     ratingAggregate: RatingAggregate;
+
+    @OneToOne(() => Wallet, wallet => wallet.professional, {
+        cascade: true,
+        eager: true,
+    })
+    wallet: Wallet;
+
+
+    @OneToMany(() => Transaction, (transaction) => transaction.professional)
+    transactions: Transaction[];
 
     // @OneToMany(() => Favorite, v => v.professional, { cascade: true })
     // favorites: Favorite[];

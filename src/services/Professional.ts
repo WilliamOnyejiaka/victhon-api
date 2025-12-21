@@ -26,7 +26,6 @@ export default class Professional extends Service {
         return await this.socketCache.get(UserType.PROFESSIONAL, userId);
     }
 
-
     private readonly repo = AppDataSource.getRepository(ProfessionalEntity);
 
     public async profile(userId: string) {

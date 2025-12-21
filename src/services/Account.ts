@@ -22,7 +22,9 @@ export default class Account extends Service {
                 accountNumber
             });
 
-            return this.responseData(201, false, "Account was added successfully", account);
+            const savedAccount: any = (await this.repo.save(account));
+
+            return this.responseData(201, false, "Account was added successfully", savedAccount);
         } catch (error) {
             return this.handleTypeormError(error);
         }

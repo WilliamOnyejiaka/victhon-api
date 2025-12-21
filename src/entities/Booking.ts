@@ -8,12 +8,13 @@ import {
     UpdateDateColumn,
     Index,
     JoinTable,
-    ManyToMany, OneToMany,
+    ManyToMany, OneToMany, OneToOne,
 } from "typeorm";
 import {Geometry, User} from "./User";
 import {Professional} from "./Professional";
 import {UserType} from "../types/constants";
 import {ServiceEntity} from "./ServiceEntity";
+import {Escrow} from "./Escrow";
 
 export enum BookingStatus {
     PENDING = "pending",
@@ -45,23 +46,12 @@ export class Booking {
     @ManyToOne(() => Professional, {onDelete: "CASCADE"})
     professional: Professional;
 
-    // @Column()
-    // @Index()
-    // packageId: string;
-
     @ManyToMany(() => ServiceEntity, (v) => v.bookings)
     @JoinTable() // owner side adds join table
     services: ServiceEntity[];
 
     @Column({type: 'varchar', length: 100, nullable: true})
     address: string;
-
-    // @Column("geometry", {
-    //     spatialFeatureType: "Point",
-    //     srid: 4326,
-    // })
-    // @Index({ spatial: true })
-    // location: Geometry
 
     @Column({name: 'start_datetime', type: 'datetime', precision: 3})
     startDateTime!: Date;
@@ -76,12 +66,12 @@ export class Booking {
     })
     status: BookingStatus;
 
-    @Column({
-        type: "enum",
-        enum: PaymentStatus,
-        default: PaymentStatus.PENDING,
+    @OneToOne(() => Escrow, escrow => escrow.booking,{
+        cascade: true,
+        eager: true,
     })
-    paymentStatus: BookingStatus;
+    @JoinColumn() // 👈 REQUIRED on owning side
+    escrow: Escrow;
 
     @Column({
         type: "enum",

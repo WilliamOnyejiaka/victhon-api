@@ -9,6 +9,7 @@ import {Professional} from "../entities/Professional";
 import logger from "../config/logger";
 import notify from "./notify";
 import {NotificationType} from "../entities/Notification";
+import {Escrow, EscrowStatus} from "../entities/Escrow";
 // import notify from "./notify";
 // import { NotificationType } from "../entities/Notification";
 // import { Queues } from '../config/bullMQ';
@@ -110,6 +111,12 @@ export default class BookingService extends Service {
                 // Assign packages array
                 booking.services = serviceExists;
 
+                const escrow = new Escrow();
+                escrow.amount = Number(booking.amount) * 100; // kobo
+                escrow.status = EscrowStatus.PENDING;
+                escrow.description = `Escrow for booking`;
+
+                booking.escrow = escrow;
                 return await manager.save(booking);
             });
 

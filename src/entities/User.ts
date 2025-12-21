@@ -13,6 +13,7 @@ import {
     PrimaryGeneratedColumn
 } from 'typeorm';
 import { Review } from "./Review";
+import {Transaction} from "./Transaction";
 
 export interface PhotoField {
     url: string;
@@ -68,6 +69,9 @@ export class User {
 
     @OneToMany(() => Review, review => review.user, { cascade: true })
     reviews: Review[];
+
+    @OneToMany(() => Transaction, (transaction) => transaction.user)
+    transactions: Transaction[];
 
     @CreateDateColumn()
     createdAt: Date;

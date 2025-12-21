@@ -1,6 +1,6 @@
 import Service from "./Service";
-import { imageFolders, CdnFolders, ResourceType } from "../types/constants";
-import { UploadedFiles, FailedFiles } from "../types";
+import {imageFolders, CdnFolders, ResourceType} from "../types/constants";
+import {UploadedFiles, FailedFiles} from "../types";
 import compressImage from "../utils/compressImage";
 import cloudinary from "../config/cloudinary";
 import logger from "../config/logger";
@@ -17,8 +17,8 @@ export default class Cloudinary extends Service {
     private getUrl(publicId: string) {
         return cloudinary.url(publicId, {
             transformation: [
-                { fetch_format: 'auto' },
-                { quality: 'auto' }
+                {fetch_format: 'auto'},
+                {quality: 'auto'}
             ]
         });
     }
@@ -42,26 +42,12 @@ export default class Cloudinary extends Service {
 
                 while (attempt < MAX_RETRIES && !success) {
                     try {
-                        // let uploadBuffer;
-                        // if (resourceType === ResourceType.IMAGE) {
-                        //     const compressed = await compressImage(file);
-                        //     if (compressed.error) {
-                        //         failedFiles.push({ filename: file.originalname, error: "Failed to compress image." });
-                        //         break; // Don't retry if image compression fails
-                        //     }
-                        //     uploadBuffer = compressed.buffer;
-                        // } else {
-                        //     uploadBuffer = file.buffer;
-                        // }
-
-                        // await fs.writeFile(tempFilePath, uploadBuffer);
 
                         const baseDetails = {
                             resource_type: resourceType,
                             folder: folder,
                             timeout: 100000,
                         };
-                            
 
                         const result: any = await cloudinary.uploader.upload(file.path, baseDetails);
 
@@ -74,14 +60,14 @@ export default class Cloudinary extends Service {
                             ? result.duration
                             : null;
 
-                        if (resourceType === ResourceType.VIDEO){
+                        if (resourceType === ResourceType.VIDEO) {
                             let thumbnailUrl = cloudinary.url(result.public_id, {
                                 resource_type: 'video',
                                 transformation: [
-                                    { start_offset: "auto" }, // Supports 'auto' or number
-                                    { width: 640, height: 360, crop: 'fill' },
-                                    { quality: 'auto' },
-                                    { format: 'jpg' }, // Crucial: Forces image output
+                                    {start_offset: "auto"}, // Supports 'auto' or number
+                                    {width: 640, height: 360, crop: 'fill'},
+                                    {quality: 'auto'},
+                                    {format: 'jpg'}, // Crucial: Forces image output
                                 ],
                             });
 
@@ -103,7 +89,7 @@ export default class Cloudinary extends Service {
                         attempt++;
                         if (attempt >= MAX_RETRIES) {
                             console.error(`Upload failed for ${file.originalname}:`, error);
-                            failedFiles.push({ filename: file.originalname, error: error.message });
+                            failedFiles.push({filename: file.originalname, error: error.message});
                         } else {
                             console.warn(`Retrying upload for ${file.originalname} (Attempt ${attempt})...`);
                             await RETRY_DELAY(attempt); // Wait before retrying
@@ -113,8 +99,9 @@ export default class Cloudinary extends Service {
             })
         );
         await deleteFiles(files);
-        return { uploadedFiles, failedFiles, publicIds };
+        return {uploadedFiles, failedFiles, publicIds};
     }
+
     public async upload(
         files: Express.Multer.File[],
         resourceType: ResourceType,
@@ -136,7 +123,7 @@ export default class Cloudinary extends Service {
                     try {
                         const buffer = resourceType === ResourceType.IMAGE
                             ? await compressImage(file)
-                            : { error: false, buffer: file.buffer };
+                            : {error: false, buffer: file.buffer};
 
                         if (!buffer.error) {
                             const result: any = await new Promise((resolve, reject) => {
@@ -152,7 +139,7 @@ export default class Cloudinary extends Service {
                                             {
                                                 format: "jpg",
                                                 transformation: [
-                                                    { width: 300, height: 200, crop: "thumb", start_offset: "auto" }
+                                                    {width: 300, height: 200, crop: "thumb", start_offset: "auto"}
                                                 ]
                                             }
                                         ]
@@ -193,14 +180,14 @@ export default class Cloudinary extends Service {
                             publicIds.push(result.public_id);
                             success = true;
                         } else {
-                            failedFiles.push({ filename: file.originalname, error: "Failed to compress image." });
+                            failedFiles.push({filename: file.originalname, error: "Failed to compress image."});
                             break; // Don't retry if image compression fails
                         }
                     } catch (error: any) {
                         attempt++;
                         if (attempt >= MAX_RETRIES) {
                             console.error(`Upload failed for ${file.originalname}:`, error);
-                            failedFiles.push({ filename: file.originalname, error: error.message });
+                            failedFiles.push({filename: file.originalname, error: error.message});
                         } else {
                             console.warn(`Retrying upload for ${file.originalname} (Attempt ${attempt})...`);
                             await RETRY_DELAY(attempt); // Wait before retrying
@@ -210,7 +197,7 @@ export default class Cloudinary extends Service {
             })
         );
 
-        return { uploadedFiles, failedFiles, publicIds };
+        return {uploadedFiles, failedFiles, publicIds};
     }
 
 
@@ -230,9 +217,9 @@ export default class Cloudinary extends Service {
         let folder = imageFolders(imageFolder)!;
 
         try {
-            uploadResult = await cloudinary.uploader.upload(filePath, { resource_type: "auto", folder: folder });
+            uploadResult = await cloudinary.uploader.upload(filePath, {resource_type: "auto", folder: folder});
         } catch (error: any) {
-            logger.error(`Error uploading file: ${error.message}`, { filePath, imageFolder });
+            logger.error(`Error uploading file: ${error.message}`, {filePath, imageFolder});
             return super.responseData(500, true, "Something went wrong");
         }
 
@@ -257,7 +244,7 @@ export default class Cloudinary extends Service {
                 url
             });
         } catch (error: any) {
-            logger.error(`Error updating file: ${error.message}`, { filePath });
+            logger.error(`Error updating file: ${error.message}`, {filePath});
             return super.responseData(500, true, "Something went wrong");
         }
     }
@@ -265,8 +252,8 @@ export default class Cloudinary extends Service {
     private fileOptions(type: string) {
         const resourceMap: Record<string, object> = {
             'image': {},
-            'audio': { resource_type: "video" },
-            'video': { resource_type: "video" },
+            'audio': {resource_type: "video"},
+            'video': {resource_type: "video"},
         };
         return resourceMap[type] || {};
     }
