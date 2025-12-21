@@ -45,7 +45,7 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
             const notification = await repo.save(newNotification);
 
             if (socketId) {
-                logger.info(`🏃 Notifying user:${data.userId}, type:${data.type}`)
+                logger.info(`🏃 Notifying ${data.userType}:${data.userId}, notification type:${data.type}`)
 
                 const notificationNamespace = io.of(Namespaces.BASE);
                 notificationNamespace.to(socketId).emit("notification", {notification});

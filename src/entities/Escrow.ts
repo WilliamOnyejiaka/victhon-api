@@ -20,6 +20,14 @@ export enum EscrowStatus {
     CANCELLED = "cancelled",
 }
 
+export enum RefundStatus {
+    NONE = "none",          // default – no refund requested
+    PENDING = "pending",    // refund initiated, waiting for Paystack
+    PROCESSING = "processing", // Paystack acknowledged, still processing
+    SUCCESS = "success",    // refund completed
+    FAILED = "failed",      // refund failed
+}
+
 @Entity("escrows")
 export class Escrow {
     @PrimaryGeneratedColumn("uuid")
@@ -40,6 +48,13 @@ export class Escrow {
         default: EscrowStatus.PENDING,
     })
     status: EscrowStatus;
+
+    @Column({
+        type: "enum",
+        enum: RefundStatus,
+        default: RefundStatus.NONE,
+    })
+    refundStatus: RefundStatus;
 
     @Column({ type: "text", nullable: true })
     description?: string;

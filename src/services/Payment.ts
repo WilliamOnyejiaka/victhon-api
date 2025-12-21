@@ -8,13 +8,14 @@ import {Escrow, EscrowStatus} from "../entities/Escrow";
 import {Transaction, TransactionStatus, TransactionType} from "../entities/Transaction";
 import logger from "../config/logger";
 import {Wallet} from "../entities/Wallet";
+import {QueueEvents, QueueNames} from "../types/constants";
+import {RabbitMQ} from "./RabbitMQ";
 
 export default class Payment extends BaseService {
 
     private readonly bookingRepo = AppDataSource.getRepository(Booking);
     private readonly transactionRepo = AppDataSource.getRepository(Transaction);
     private readonly walletRepo = AppDataSource.getRepository(Wallet);
-
     private readonly escrowRepo = AppDataSource.getRepository(Escrow);
 
     private readonly PAYSTACK_SECRET_KEY = env(EnvKey.PAYSTACK_SECRET_KEY)!;
@@ -51,7 +52,7 @@ export default class Payment extends BaseService {
                 type: TransactionType.BOOKING_DEPOSIT,
                 amount: booking.escrow.amount,
                 escrowId: booking.escrow.id,
-                status: TransactionStatus.PENDING,
+                status: TransactionStatus.FAILED,
             });
 
             await this.transactionRepo.save(transaction);
@@ -80,14 +81,12 @@ export default class Payment extends BaseService {
 
                 transaction.accessCode = access_code;
                 transaction.reference = reference;
+                transaction.status = TransactionStatus.PENDING;
 
                 await this.transactionRepo.save(transaction);
 
                 return this.responseData(200, false, "Payment was initiated successfully", response.data.data);
             }
-
-            transaction.status = TransactionStatus.FAILED;
-            await this.transactionRepo.save(transaction);
 
             return this.responseData(500, true, "Payment initialization failed");
         } catch (error) {
@@ -96,7 +95,101 @@ export default class Payment extends BaseService {
         }
     }
 
-     public async successfulCharge(eventData: any) {
+    public async successfulCharge(eventData: any) {
+        try {
+            const {transactionId} = eventData.metadata;
+
+            if (!transactionId) {
+                logger.error("No transactionId in webhook metadata");
+                return;
+            }
+
+            await AppDataSource.transaction(async (manager) => {
+                // Fetch transaction with relations using the transactional manager
+                const payment = await manager.findOne(Transaction, {
+                    where: {id: transactionId},
+                    relations: ["escrow", "escrow.booking", "escrow.booking.professional"],
+                });
+
+                if (!payment) {
+                    logger.error(`Payment not found for transactionId: ${transactionId}`);
+                    throw new Error("Transaction not found"); // Will trigger rollback
+                }
+
+                // Idempotency: Prevent double processing
+                if (payment.status === TransactionStatus.SUCCESS) {
+                    logger.info(`Payment already processed: ${transactionId}`);
+                    return; // Exit early, no changes made
+                }
+
+                // Update transaction status
+                await manager.update(
+                    Transaction,
+                    {id: transactionId},
+                    {status: TransactionStatus.SUCCESS}
+                );
+
+                if (payment.type === TransactionType.BOOKING_DEPOSIT) {
+                    const escrow = payment.escrow!;
+
+                    // Update escrow to PAID
+                    await manager.update(
+                        Escrow,
+                        {id: escrow.id},
+                        {status: EscrowStatus.PAID}
+                    );
+
+                    // Find or create professional's wallet
+                    let wallet = await manager.findOne(Wallet, {
+                        where: {professionalId: escrow.booking.professionalId},
+                    });
+
+                    if (!wallet) {
+                        wallet = manager.create(Wallet, {
+                            professionalId: escrow.booking.professionalId,
+                            balance: 0,
+                            pendingAmount: 0,
+                            totalBalance: 0,
+                        });
+                        await manager.save(Wallet, wallet);
+                    }
+
+                    const newPendingAmount: number = Number(wallet.pendingAmount) + Number(escrow.amount);
+                    const newTotalBalance = Number(wallet.balance) + newPendingAmount;
+
+                    // Update wallet balances
+                    await manager.update(
+                        Wallet,
+                        {id: wallet.id},
+                        {
+                            pendingAmount: newPendingAmount,
+                            totalBalance: newTotalBalance,
+                        }
+                    );
+
+                    const payload = {
+                        transactionId: transactionId,
+                        professionalId: escrow.booking.professionalId
+                    };
+                    const queueName = QueueNames.PAYMENT;
+                    const eventType = QueueEvents.PAYMENT_BOOK_SUCCESSFUL
+                    await RabbitMQ.publishToExchange(queueName, eventType, {
+                        eventType: eventType,
+                        payload,
+                    });
+                }
+
+                logger.info(`🤑 Payment successfully processed for transaction: ${transactionId}`);
+            });
+            // If transaction completes successfully, it auto-commits
+        } catch (error) {
+            // Any error inside the transaction automatically rolls back
+            logger.error(`Payment processing failed for transactionId: ${eventData.metadata?.transactionId}`, error);
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async successfulChargea(eventData: any) {
         try {
             const {transactionId} = eventData.metadata;
             const payment = await this.transactionRepo.findOne({
@@ -171,20 +264,14 @@ export default class Payment extends BaseService {
         // Handle events
         switch (event.event) {
             case 'charge.success':
-                console.log(event)
-                // const name = `charge-successful-${Date.now()}`;
-                //
-                // await bree.add({
-                //     name: name,
-                //     path: './src/jobs/charge-successful.js',
-                //     worker: {
-                //         workerData: { data }
-                //     }
-                // });
-                //
-                // // Run job once
-                // await bree.start(name);
-                await this.successfulCharge(data);
+
+                const payload = {data};
+                const queueName = QueueNames.PAYMENT;
+                const eventType = QueueEvents.PAYMENT_CHARGE_SUCCESSFUL
+                await RabbitMQ.publishToExchange(queueName, eventType, {
+                    eventType: eventType,
+                    payload,
+                });
                 break;
             case 'charge.failed':
                 console.log('Payment failed:', event.data.reference);
@@ -208,58 +295,91 @@ export default class Payment extends BaseService {
         return this.responseData(200, false, null);
     }
 
-    // public async refundTransaction(bookingId, userId) {
-    //     try {
-    //         const payment = await PaymentModel.findOne({bookingId, userId});
-    //         if (!payment) return this.responseData(404, true, "Payment was not found");
-    //
-    //         if (payment && payment.status == "success") return this.responseData(400, true, "Invalid Refund");
-    //
-    //         const response = await axios.post(
-    //             'https://api.paystack.co/refund',
-    //             {
-    //                 transaction: transactionId,
-    //                 amount // optional, in kobo
-    //             },
-    //             {
-    //                 headers: {
-    //                     Authorization: `Bearer ${this.PAYSTACK_SECRET_KEY}`,
-    //                     'Content-Type': 'application/json'
-    //                 }
-    //             }
-    //         );
-    //
-    //         console.log(response.data);
-    //         return this.responseData(200, false, "Refund was initiated successfully", response.data);
-    //     } catch (error) {
-    //         logger.error(error);
-    //         return this.handleTypeormError(error);
-    //     }
-    // }
+    public async refundTransaction(bookingId: string, userId: string) {
+        try {
+            const booking = await this.bookingRepo.findOne({
+                where: {id: bookingId, userId},
+                relations: ["escrow", "user"]
+            });
 
-    // async verifyBookingTransaction(bookingId: string, userId: string) {
-    //     try {
-    //         const payment = await PaymentModel.findOne({ bookingId, userId }).lean();
-    //         if (!payment) return this.responseData(404, true, "Payment was not found");
-    //
-    //         // Verify the transaction
-    //         const response = await axios.get(
-    //             `https://api.paystack.co/transaction/verify/${payment.paystackReference}`,
-    //             {
-    //                 headers: {
-    //                     Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`
-    //                 }
-    //             }
-    //         );
-    //
-    //         const { data } = response.data;
-    //         return this.responseData(200, false, "message", { status: data.status });
-    //     } catch (error) {
-    //         logger.error(error);
-    //         const { statusCode, message } = this.handleMongoError(error);
-    //         return this.responseData(statusCode, true, message);
-    //     }
-    // }
+            if (!booking) return this.responseData(404, true, "Booking was not found");
+            const escrow = booking.escrow;
 
+            if (escrow && escrow.status !== EscrowStatus.PAID) return this.responseData(400, true, "Invalid Refund");
 
+            const payment = await this.transactionRepo.findOne({
+                where: {
+                    escrowId: escrow.id,
+                    type: TransactionType.BOOKING_DEPOSIT,
+                    status: TransactionStatus.SUCCESS,
+                    userId: userId,
+                },
+                relations: ["escrow", "escrow.booking", "escrow.booking.professional"],
+            });
+
+            if (!payment) return this.responseData(404, true, "Payment was not found");
+
+            const response = await axios.post(
+                'https://api.paystack.co/refund',
+                {
+                    transaction: payment.reference,
+                    amount: payment.amount,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${this.PAYSTACK_SECRET_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            console.log(response.data);
+            return this.responseData(200, false, "Refund was initiated successfully", response.data);
+        } catch (error) {
+            logger.error(error);
+            return this.handleTypeormError(error);
+        }
+    }
+
+    async verifyBookingTransaction(bookingId: string, userId: string) {
+        try {
+            const booking = await this.bookingRepo.findOne({
+                where: {id: bookingId, userId},
+                relations: ["escrow", "user"]
+            });
+
+            if (!booking) return this.responseData(404, true, "Booking was not found");
+            const escrow = booking.escrow;
+
+            if (escrow && escrow.status !== EscrowStatus.PAID) return this.responseData(400, true, "Invalid Refund");
+
+            const payment = await this.transactionRepo.findOne({
+                where: {
+                    escrowId: escrow.id,
+                    type: TransactionType.BOOKING_DEPOSIT,
+                    status: TransactionStatus.PENDING,
+                    userId: userId,
+                },
+                relations: ["escrow", "escrow.booking", "escrow.booking.professional"],
+            });
+
+            if (!payment) return this.responseData(404, true, "Payment was not found");
+
+            // Verify the transaction
+            const response = await axios.get(
+                `https://api.paystack.co/transaction/verify/${payment.reference}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${this.PAYSTACK_SECRET_KEY}`
+                    }
+                }
+            );
+
+            const {data} = response.data;
+            return this.responseData(200, false, "Booking transaction has been verified", {status: data.status});
+        } catch (error) {
+            logger.error(error);
+            return this.handleTypeormError(error);
+        }
+    }
 }

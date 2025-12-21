@@ -225,7 +225,8 @@ export enum QueueType {
 
 export enum QueueNames {
     USER = "victhon_user_queue",
-    NOTIFICATION = "victhon_notification_queue"
+    NOTIFICATION = "victhon_notification_queue",
+    PAYMENT = "victhon_payment_queue",
 }
 
 export enum QueueEvents {
@@ -237,8 +238,9 @@ export enum QueueEvents {
     ADMIN_NOTIFICATION = "notification.notify_admin",
     ADMIN_NOTIFICATION_OFFLINE = "notification.offline_admin",
     MASS_EMAIL = "notification.mass_email",
-    SIGN_UP_EMAIL = "notification.sign_up_email"
-
+    SIGN_UP_EMAIL = "notification.sign_up_email",
+    PAYMENT_CHARGE_SUCCESSFUL = "payment.charge_successful",
+    PAYMENT_BOOK_SUCCESSFUL = "payment.book_successful",
 };
 
 
