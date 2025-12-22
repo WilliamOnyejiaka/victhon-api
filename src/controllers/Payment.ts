@@ -21,7 +21,7 @@ export default class Payment {
 
         const {bookingId} = req.params;
 
-        const serviceResult = await Payment.service.refundTransaction(bookingId!, userId);
+        const serviceResult = await Payment.service.refundBooking(bookingId!, userId);
         Controller.response(res, serviceResult);
     }
 

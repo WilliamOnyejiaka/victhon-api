@@ -5,7 +5,6 @@ import BaseService from "../services/Service";
 import {QueueEvents, QueueNames} from "../types/constants";
 import {exchange} from "../types";
 import logger from "../config/logger";
-import UserCache from "../cache/UserCache";
 import {UserType} from "../types/constants";
 import Payment from "../services/Payment";
 import {NotificationType} from "../entities/Notification";

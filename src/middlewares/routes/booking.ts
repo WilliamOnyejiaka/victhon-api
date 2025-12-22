@@ -12,13 +12,13 @@ export const createBooking = [
 
     // packageId UUID
     body("serviceIds")
-        .isArray({ min: 1 })
+        .isArray({min: 1})
         .withMessage("serviceId must be a non-empty array"),
 
     body('address')
         .optional()
         .isString().withMessage('Address must be a string')
-        .isLength({ min: 3 }).withMessage('Address must be at least 3 characters'),
+        .isLength({min: 3}).withMessage('Address must be at least 3 characters'),
 
     body("serviceIds.*")
         .isUUID()
@@ -67,6 +67,8 @@ export const acceptBooking = [
 ];
 
 export const rejectBooking = [...acceptBooking];
+export const reviewBooking = [...acceptBooking]
+
 export const completeBooking = [
     verifyJWT([UserType.USER]),
     param("bookingId")
@@ -74,6 +76,8 @@ export const completeBooking = [
         .isUUID().withMessage("bookingId must be a valid UUID"),
     handleValidationErrors
 ];
+
+export const cancelBooking = [...completeBooking];
 
 export const getProBooking = [
     verifyJWT([UserType.PROFESSIONAL]),
@@ -100,8 +104,8 @@ export const proBookings = [
 
 export const userBookings = [
     verifyJWT([UserType.USER]),
-    query('page').optional().isInt({ min: 1 }).withMessage("page must be an integer"),
-    query('limit').optional().isInt({ min: 1 }).withMessage("limit must be an integer"),
+    query('page').optional().isInt({min: 1}).withMessage("page must be an integer"),
+    query('limit').optional().isInt({min: 1}).withMessage("limit must be an integer"),
     handleValidationErrors
 ];
 
@@ -110,7 +114,7 @@ export const bookings = [
     param("professionalId")
         .notEmpty().withMessage("professionalId is required")
         .isUUID().withMessage("professionalId must be a valid UUID"),
-    query('page').optional().isInt({ min: 1 }).withMessage("page must be an integer"),
-    query('limit').optional().isInt({ min: 1 }).withMessage("limit must be an integer"),
+    query('page').optional().isInt({min: 1}).withMessage("page must be an integer"),
+    query('limit').optional().isInt({min: 1}).withMessage("limit must be an integer"),
     handleValidationErrors
 ];

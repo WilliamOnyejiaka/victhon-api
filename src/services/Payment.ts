@@ -8,9 +8,11 @@ import {Escrow, EscrowStatus, RefundStatus} from "../entities/Escrow";
 import {Transaction, TransactionStatus, TransactionType} from "../entities/Transaction";
 import logger from "../config/logger";
 import {Wallet} from "../entities/Wallet";
-import {QueueEvents, QueueNames} from "../types/constants";
+import {QueueEvents, QueueNames, UserType} from "../types/constants";
 import {RabbitMQ} from "./RabbitMQ";
 import {In} from "typeorm";
+import notify from "./notify";
+import {NotificationType} from "../entities/Notification";
 
 export default class Payment extends BaseService {
 
@@ -194,7 +196,7 @@ export default class Payment extends BaseService {
         }
     }
 
-    public async refundTransaction(bookingId: string, userId: string) {
+    public async refundBooking(bookingId: string, userId: string) {
         try {
             const booking = await this.bookingRepo.findOne({
                 where: {id: bookingId, userId},
@@ -255,8 +257,17 @@ export default class Payment extends BaseService {
 
             if (response.status === 200 && response.data.status) {
                 refundTx.status = TransactionStatus.PENDING;
+                booking.status = BookingStatus.CANCELLED;
 
+                await this.bookingRepo.save(booking);
                 await this.transactionRepo.save(refundTx);
+
+                await notify({
+                    userId: booking.professionalId,
+                    userType: UserType.PROFESSIONAL,
+                    type: NotificationType.CANCEL_BOOKING,
+                    data: {...booking, professional: undefined}
+                });
 
                 return this.responseData(200, false, "Refund was initiated successfully", response.data.data);
             }

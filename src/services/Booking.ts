@@ -10,6 +10,7 @@ import notify from "./notify";
 import {NotificationType} from "../entities/Notification";
 import {Escrow, EscrowStatus} from "../entities/Escrow";
 import {RabbitMQ} from "./RabbitMQ";
+import Payment from "./Payment";
 
 
 export default class BookingService extends Service {
@@ -331,6 +332,43 @@ export default class BookingService extends Service {
         }
     }
 
+    public async reviewBooking(bookingId: string, proId: string) {
+        try {
+            const booking = await this.repo.findOne({
+                where: {
+                    id: bookingId,
+                    professionalId: proId
+                },
+                relations: ['professional', 'user'],
+            });
+
+            if (!booking) return this.responseData(404, true, "Booking was not found");
+
+            if (![BookingStatus.ACCEPTED,BookingStatus.REVIEW].includes(booking.status)) return this.responseData(400, true, `This booking can't be put for review`);
+
+            booking.status = BookingStatus.REVIEW;
+            const updatedBooking = await this.repo.save(booking);
+
+            await notify({
+                userId: booking.userId,
+                userType: UserType.USER,
+                type: NotificationType.REVIEW_BOOKING,
+                data: {...updatedBooking, user: undefined}
+            });
+
+            return this.responseData(200, false, "Booking has been updated successfully", {
+                ...updatedBooking,
+                professional: undefined
+            });
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async cancelBooking(bookingId: string, userId: string) {
+        return await (new Payment()).refundBooking(bookingId, userId);
+    }
+
     public async completeBooking(bookingId: string, userId: string) {
         try {
             const result = await AppDataSource.transaction(async manager => {
@@ -347,7 +385,7 @@ export default class BookingService extends Service {
                     throw new Error("Booking not found");
                 }
 
-                if (booking.status !== BookingStatus.ACCEPTED) {
+                if (booking.status !== BookingStatus.REVIEW) {
                     throw new Error("Booking cannot be completed");
                 }
 
@@ -357,7 +395,6 @@ export default class BookingService extends Service {
 
                 booking.status = BookingStatus.COMPLETED;
                 booking.escrow.status = EscrowStatus.RELEASED;
-
 
                 return await manager.save(booking)
             });

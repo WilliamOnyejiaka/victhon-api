@@ -1,14 +1,15 @@
-import { Router, Request, Response } from 'express';
+import {Router, Request, Response} from 'express';
 import asyncHandler from "express-async-handler";
 import Controller from "../controllers/Booking";
 import {
     acceptBooking,
-    bookings, completeBooking,
+    bookings, cancelBooking, completeBooking,
     createBooking,
     getProBooking,
     getUserBooking,
     proBookings,
     rejectBooking,
+    reviewBooking,
     userBookings
 } from '../middlewares/routes/booking';
 
@@ -22,13 +23,12 @@ booking.get("/users", userBookings, asyncHandler(Controller.getUserBookings));
 booking.get("/schedules/:professionalId", bookings, asyncHandler(Controller.bookings));
 
 
-
-
 booking.post("/", createBooking, asyncHandler(Controller.book));
 booking.patch("/accept/:bookingId", acceptBooking, asyncHandler(Controller.acceptBooking));
 booking.patch("/reject/:bookingId", rejectBooking, asyncHandler(Controller.rejectBooking));
 booking.patch("/complete/:bookingId", completeBooking, asyncHandler(Controller.completeBooking));
-
+booking.patch("/review/:bookingId", reviewBooking, asyncHandler(Controller.reviewBooking));
+booking.patch("/cancel/:bookingId", cancelBooking, asyncHandler(Controller.cancelBooking));
 
 
 // booking.post("/schedule", asyncHandler(Controller.createSchedule));

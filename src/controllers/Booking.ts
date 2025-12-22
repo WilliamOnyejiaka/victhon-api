@@ -47,6 +47,23 @@ export default class Booking {
         Controller.response(res, serviceResult);
     }
 
+    public static async reviewBooking(req: Request, res: Response) {
+        const {id: userId} = res.locals.data;
+        const {bookingId} = req.params;
+
+        const serviceResult = await Booking.service.reviewBooking(bookingId!, userId);
+
+        Controller.response(res, serviceResult);
+    }
+
+    public static async cancelBooking(req: Request, res: Response) {
+        const {id: userId} = res.locals.data;
+        const {bookingId} = req.params;
+
+        const serviceResult = await Booking.service.cancelBooking(bookingId!, userId);
+
+        Controller.response(res, serviceResult);
+    }
 
     public static async getProBooking(req: Request, res: Response) {
         const {id: userId} = res.locals.data;
@@ -71,8 +88,8 @@ export default class Booking {
     }
 
     public static async getUserBookings(req: Request, res: Response) {
-        const { id: userId } = res.locals.data;
-        let { page, limit } = req.query;
+        const {id: userId} = res.locals.data;
+        let {page, limit} = req.query;
 
         const parsedPage = parseInt(page as string) || 1;
         const parsedLimit = parseInt(limit as string) || 10;
@@ -84,8 +101,8 @@ export default class Booking {
     }
 
     public static async bookings(req: Request, res: Response) {
-        const { id: userId } = res.locals.data;
-        let { page, limit } = req.query;
+        const {id: userId} = res.locals.data;
+        let {page, limit} = req.query;
         const {professionalId} = req.params;
 
         const parsedPage = parseInt(page as string) || 1;
