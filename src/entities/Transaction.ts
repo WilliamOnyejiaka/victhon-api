@@ -4,6 +4,7 @@ import {
     Column,
     ManyToOne,
     CreateDateColumn, Check, JoinColumn,
+    Index, UpdateDateColumn,
 } from "typeorm";
 import {User} from "./User";
 import {Professional} from "./Professional";
@@ -22,6 +23,7 @@ export enum TransactionStatus {
     PENDING = "pending",
     SUCCESS = "success",
     FAILED = "failed",
+    PROCESSING = "processing",
 }
 
 @Entity("transactions")
@@ -51,6 +53,7 @@ export class Transaction {
     @Column("decimal", {precision: 12, scale: 2})
     amount: number;
 
+    @Index()
     @Column({
         type: "enum",
         enum: TransactionStatus,
@@ -85,6 +88,10 @@ export class Transaction {
     @Column({nullable: true})
     accessCode: string;
 
+    @Index()
     @CreateDateColumn()
     createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
 }

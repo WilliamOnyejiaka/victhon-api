@@ -53,7 +53,6 @@ payment.route(QueueEvents.PAYMENT_BOOK_SUCCESSFUL, async (message: any, io: Serv
     } catch (error) {
         service.handleTypeormError(error);
     }
-
 });
 
 

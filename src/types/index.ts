@@ -1,10 +1,19 @@
-import { Server, Socket } from "socket.io";
-import { Job } from "bullmq";
-import { QueueType } from "./constants";
+import {Server, Socket} from "socket.io";
+import {Job} from "bullmq";
+import {QueueType} from "./constants";
 
 export interface Cache { // TODO: use this only for users
     get: (key: string) => Promise<{ error: boolean; data?: any }>;
     set: (email: string, data: any) => Promise<boolean>;
+}
+
+export class EditUserDto {
+    email?: string;
+    phone?: string;
+    firstName?: string;
+    lastName?: string;
+    isActive?: boolean;
+    file?: Express.Multer.File | undefined;
 }
 
 
@@ -75,7 +84,11 @@ export interface QueueConfig {
     handlers: Record<string, EventHandler<any>>;
 }
 
-export interface WorkerConfig { connection: { url: string }, concurrency?: number, limiter?: { max: number, duration: number } }
+export interface WorkerConfig {
+    connection: { url: string },
+    concurrency?: number,
+    limiter?: { max: number, duration: number }
+}
 
 export interface IWorker<T> {
     process: (job: Job<T>) => Promise<void>,

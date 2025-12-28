@@ -88,7 +88,43 @@ export default class Authentication extends Service {
     //     }
     // }
 
-    public async signUp(signUpData: any) {
+    public async signUp(email: string, password: string) {
+        try {
+            const userRepository = AppDataSource.getRepository(User);
+
+            let userEmailExists = await userRepository.findOneBy({email: email});
+            if (userEmailExists) {
+                return this.responseData(400, true, `Email already exists.`);
+            }
+
+            password = Password.hashPassword(password, this.storedSalt);
+
+            const user = userRepository.create({
+                email,
+                password
+            });
+
+            const savedUser: any = (await userRepository.save(user))
+
+            const token = this.generateUserToken({
+                id: savedUser.id,
+                userType: UserType.USER
+            }, UserType.USER);
+            const data = {
+                user: {
+                    ...savedUser,
+                    password: undefined
+                },
+                token: token,
+            };
+
+            return this.responseData(201, false, "User has been created successfully", data);
+        } catch (error) {
+            return super.handleTypeormError(error);
+        }
+    }
+
+    public async signUps(signUpData: any) {
         try {
 
             const userRepo = AppDataSource.getRepository(User);

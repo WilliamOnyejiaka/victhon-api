@@ -45,10 +45,10 @@ export class User {
     @Column({ type: 'text', select: false })
     password: string;
 
-    @Column({ type: 'varchar', length: 50 })
+    @Column({ type: 'varchar', length: 50 , nullable: true })
     firstName: string;
 
-    @Column({ type: 'varchar', length: 50 })
+    @Column({ type: 'varchar', length: 50, nullable: true  })
     lastName: string;
 
     @Column({ type: 'json', nullable: true })

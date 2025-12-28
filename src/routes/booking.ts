@@ -3,7 +3,9 @@ import asyncHandler from "express-async-handler";
 import Controller from "../controllers/Booking";
 import {
     acceptBooking,
-    bookings, cancelBooking, completeBooking,
+    bookings,
+    cancelBooking,
+    completeBooking,
     createBooking,
     getProBooking,
     getUserBooking,

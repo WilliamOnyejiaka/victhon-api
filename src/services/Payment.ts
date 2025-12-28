@@ -107,6 +107,149 @@ export default class Payment extends BaseService {
         }
     }
 
+
+    public async reconcilePendingTransactions() {
+
+        const BATCH_SIZE = 100;
+        const TIMEOUT_MS = 30 * 60 * 1000;
+        const MAX_BATCHES = 1000;
+
+        const threshold = new Date(Date.now() - TIMEOUT_MS);
+        let batches = 0;
+
+        while (batches++ < MAX_BATCHES) {
+            const transactions = await AppDataSource.transaction(async manager => {
+                /**
+                 * 1️⃣ Select rows and lock them
+                 * 2️⃣ Skip rows locked by other workers
+                 * 3️⃣ Immediately mark as PROCESSING
+                 */
+                const txs = await manager
+                    .createQueryBuilder(Transaction, "tx")
+                    .where("tx.status = :status", {status: TransactionStatus.PENDING})
+                    .andWhere("tx.createdAt < :threshold", {threshold})
+                    .orderBy("tx.createdAt", "ASC")
+                    .limit(BATCH_SIZE)
+                    .setLock("pessimistic_write")
+                    .getMany();
+
+                if (txs.length === 0) return [];
+
+                await manager
+                    .createQueryBuilder()
+                    .update(Transaction)
+                    .set({status: TransactionStatus.PROCESSING})
+                    .whereInIds(txs.map(t => t.id))
+                    .execute();
+
+                return txs;
+            });
+
+            // 🔚 Nothing left to process
+            if (transactions.length === 0) {
+                logger.info("✅ No more pending transactions");
+                break;
+            }
+
+            logger.info(`📦 Processing ${transactions.length} transactions`);
+
+            // 2️⃣ Process OUTSIDE lock
+            for (const tx of transactions) {
+                try {
+                    if (!tx.reference) {
+                        await this.failTransaction(tx.id, "Missing reference");
+                        continue;
+                    }
+
+                    const paystackTx = await this.verifyPaystackTransaction(tx.reference);
+
+                    if (paystackTx.status === "success") {
+                        await RabbitMQ.publishToExchange(QueueNames.PAYMENT,  QueueEvents.PAYMENT_CHARGE_SUCCESSFUL, {
+                            eventType: QueueEvents.PAYMENT_CHARGE_SUCCESSFUL,
+                            payload: {data: paystackTx},
+                        });
+                    } else if (paystackTx.status === "failed") {
+                        await this.failTransaction(tx.id, "Paystack failed");
+                    } else {
+                        // still pending → return to PENDING for retry
+                        await this.resetToPending(tx.id);
+                    }
+
+                } catch (err) {
+                    logger.error(`❌ Error processing tx ${tx.id}`, err);
+                    await this.failTransaction(tx.id,"Error processing tx");
+                }
+            }
+        }
+    }
+
+    public async verifyPaystackTransaction(reference: string) {
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY_MS = 1000; // 1 second between retries
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                const response = await axios.get(
+                    `https://api.paystack.co/transaction/verify/${reference}`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${this.PAYSTACK_SECRET_KEY}`,
+                        },
+                    }
+                );
+                return response.data; // success, return immediately
+            } catch (error) {
+                console.error(`Attempt ${attempt} failed:`, error);
+
+                if (attempt === MAX_RETRIES) {
+                    throw new Error(`Failed to verify transaction after ${MAX_RETRIES} attempts`);
+                }
+
+                // wait a bit before retrying
+                await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+            }
+        }
+    }
+
+    public async succeedTransaction(
+        tx: Transaction
+    ) {
+
+        await AppDataSource.transaction(async manager => {
+            // 🔐 Idempotency guard
+            const fresh = await manager.findOneBy(Transaction, {id: tx.id});
+            if (!fresh || fresh.status === TransactionStatus.SUCCESS) return;
+
+            // TODO: wallet / escrow logic here
+
+            await manager.update(
+                Transaction,
+                {id: tx.id},
+                {status: TransactionStatus.SUCCESS}
+            );
+        });
+    }
+
+    public async failTransaction(
+        txId: string,
+        reason: string
+    ) {
+        await AppDataSource.getRepository(Transaction).update(
+            {id: txId},
+            {status: TransactionStatus.FAILED}
+        );
+    }
+
+    public async resetToPending(
+        txId: string
+    ) {
+        await AppDataSource.getRepository(Transaction).update(
+            {id: txId},
+            {status: TransactionStatus.PENDING}
+        );
+    }
+
+
     public async successfulCharge(eventData: any) {
         try {
             const {transactionId} = eventData.metadata;
@@ -116,11 +259,14 @@ export default class Payment extends BaseService {
                 return;
             }
 
+            let eventToPublish = null;
+
             await AppDataSource.transaction(async (manager) => {
                 // Fetch transaction with relations using the transactional manager
                 const payment = await manager.findOne(Transaction, {
                     where: {id: transactionId},
                     relations: ["escrow", "escrow.booking", "escrow.booking.professional", "escrow.booking.professional.wallet"],
+                    lock: {mode: "pessimistic_write"}
                 });
 
                 if (!payment) {
@@ -142,7 +288,19 @@ export default class Payment extends BaseService {
                 );
 
                 if (payment.type === TransactionType.BOOKING_DEPOSIT) {
-                    const escrow = payment.escrow!;
+
+                    const escrow = payment.escrow;
+                    if (!escrow) {
+                        throw new Error("Escrow not found for transaction");
+                    }
+
+                    /**
+                     * 5️⃣ Escrow idempotency
+                     */
+                    if (escrow.status === EscrowStatus.PAID) {
+                        logger.info(`Escrow already PAID for transaction: ${transactionId}`);
+                        return;
+                    }
 
                     // Update escrow to PAID
                     await manager.update(
@@ -154,6 +312,7 @@ export default class Payment extends BaseService {
                     // Find or create professional's wallet
                     const wallet = await manager.findOne(Wallet, {
                         where: {professionalId: escrow.booking.professionalId},
+                        lock: {mode: "pessimistic_write"}
                     });
 
                     if (!wallet) {
@@ -174,20 +333,42 @@ export default class Payment extends BaseService {
                         }
                     );
 
-                    const payload = {
-                        transactionId: transactionId,
-                        professionalId: escrow.booking.professionalId
+                    eventToPublish = {
+                        queueName: QueueNames.PAYMENT,
+                        eventType: QueueEvents.PAYMENT_BOOK_SUCCESSFUL,
+                        payload: {
+                            transactionId: transactionId,
+                            professionalId: escrow.booking.professionalId
+                        }
                     };
-                    const queueName = QueueNames.PAYMENT;
-                    const eventType = QueueEvents.PAYMENT_BOOK_SUCCESSFUL
-                    await RabbitMQ.publishToExchange(queueName, eventType, {
-                        eventType: eventType,
-                        payload,
-                    });
+
+
+                    // const payload = {
+                    //     transactionId: transactionId,
+                    //     professionalId: escrow.booking.professionalId
+                    // };
+                    // const queueName = QueueNames.PAYMENT;
+                    // const eventType = QueueEvents.PAYMENT_BOOK_SUCCESSFUL
+                    // await RabbitMQ.publishToExchange(queueName, eventType, {
+                    //     eventType: eventType,
+                    //     payload,
+                    // });
                 }
 
                 logger.info(`🤑 Payment successfully processed for transaction: ${transactionId}`);
             });
+
+            // Really validate here
+            if (eventToPublish != null) {
+                await RabbitMQ.publishToExchange(
+                    (eventToPublish as any).queueName,
+                    (eventToPublish as any).eventType,
+                    {
+                        eventType: (eventToPublish as any).eventType,
+                        payload: (eventToPublish as any).payload
+                    }
+                );
+            }
             // If transaction completes successfully, it auto-commits
         } catch (error) {
             // Any error inside the transaction automatically rolls back
@@ -295,7 +476,20 @@ export default class Payment extends BaseService {
                     return;
                 }
 
-                const escrow = refundTx.escrow!;
+                const escrow = refundTx.escrow;
+                if (!escrow) {
+                    throw new Error("Escrow not found for refund transaction");
+                }
+
+                if (escrow.refundStatus === RefundStatus.SUCCESS) {
+                    logger.info(`Escrow already refunded: ${escrow.id}`);
+                    return null;
+                }
+
+                if (escrow.status !== EscrowStatus.PAID) {
+                    throw new Error("Escrow not in refundable state");
+                }
+
                 const wallet = await manager.findOne(Wallet, {
                     where: {professionalId: escrow.booking.professionalId},
                     lock: {mode: "pessimistic_write"},
@@ -347,11 +541,11 @@ export default class Payment extends BaseService {
         switch (event.event) {
             case 'charge.success':
 
-                eventType = QueueEvents.PAYMENT_CHARGE_SUCCESSFUL
-                await RabbitMQ.publishToExchange(queueName, eventType, {
-                    eventType: eventType,
-                    payload: queuePayload,
-                });
+                // eventType = QueueEvents.PAYMENT_CHARGE_SUCCESSFUL
+                // await RabbitMQ.publishToExchange(queueName, eventType, {
+                //     eventType: eventType,
+                //     payload: queuePayload,
+                // });
                 break;
 
             case 'charge.failed':

@@ -25,6 +25,13 @@ export default class Payment {
         Controller.response(res, serviceResult);
     }
 
+    public static  async verifyPaystackTransaction(req: Request, res: Response) {
+        const {id: userId} = res.locals.data;
+        const {reference} = req.params;
+        const result = await Payment.service.verifyPaystackTransaction(reference!);
+        res.status(200).send(result);
+    }
+
 
     public static async webhook(req: Request, res: Response) {
 

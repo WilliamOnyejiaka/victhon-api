@@ -8,10 +8,9 @@ export default class Authentication {
     private static service = new Service();
 
     public static async signUp(req: Request, res: Response) {
-        let signUpData = req.body;
-        signUpData.file = req.file;
+        const { email, password } = req.body;
 
-        const serviceResult = await Authentication.service.signUp(signUpData);
+        const serviceResult = await Authentication.service.signUp(email, password);
         res.status(serviceResult.statusCode).json(serviceResult.json);
     }
 

@@ -1,14 +1,15 @@
 import cron from "node-cron";
-import { createClient, RedisClientType } from "redis";
-import env, { EnvKey } from "./config/env";
+import {createClient, RedisClientType} from "redis";
+import env, {EnvKey} from "./config/env";
 import axios from "axios";
-import { AppDataSource } from "./data-source";
+import {AppDataSource} from "./data-source";
 import redisClient from "./config/redis";
 import createApp from "./config/app";
-import { Worker } from "bullmq";
-import { IWorker, WorkerConfig } from "./types";
+import {Worker} from "bullmq";
+import {IWorker, WorkerConfig} from "./types";
 import {RabbitMQ} from "./services/RabbitMQ";
 import {QueueName, QUEUES} from "./config/queues";
+import Payment from "./services/Payment";
 // import { Notification } from "./queues/NotificationQueue";
 // import { NewBooking } from "./queues/NewBooking";
 // import { UpdateRatingAgg } from "./queues/UpdateRatingAgg";
@@ -37,7 +38,7 @@ const PORT = env(EnvKey.PORT)!;
         // const pubClient: RedisClientType = createClient({ url: env(EnvKey.REDIS_URL)! });
         const pubClient: RedisClientType = createClient({
             url: env(EnvKey.REDIS_URL)!,  // e.g., rediss://...
-            socket: { reconnectStrategy: retries => Math.min(retries * 50, 500) }  // Exponential backoff
+            socket: {reconnectStrategy: retries => Math.min(retries * 50, 500)}  // Exponential backoff
         });
         pubClient.on("error", (err) => {
             console.error('Redis pubClient connection error:', err);
@@ -54,7 +55,7 @@ const PORT = env(EnvKey.PORT)!;
             .then(() => console.log("✅ DB has connected successfully"))
             .catch(console.error);
 
-        const { server: app, io } = await createApp(pubClient, subClient);
+        const {server: app, io} = await createApp(pubClient, subClient);
 
         for (const queueName of Object.keys(QUEUES) as QueueName[]) RabbitMQ.startConsumer(queueName, io); //! Add try catch
 
@@ -81,7 +82,19 @@ const PORT = env(EnvKey.PORT)!;
 
 })();
 
-// cron.schedule('*/10 * * * *', async () => {
-//     // const response = await axios.get(`${env(EnvKey.MAIN_API)}/ping`);
-//     // console.log(response.data);
-// });
+let isRunning = false;
+
+cron.schedule('*/5 * * * *', async () => {
+    if (isRunning) return;
+
+    isRunning = true;
+
+    try {
+        const paymentService = new Payment();
+        await paymentService.reconcilePendingTransactions();
+    } catch (err) {
+        console.error('Reconciliation cron failed', err);
+    }finally {
+        isRunning = false;
+    }
+});

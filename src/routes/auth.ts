@@ -1,12 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import asyncHandler from "express-async-handler";
 import Authentication from "../controllers/Authentication";
-import { signUp, login, professionalSignUp } from "../middlewares/routes/auth";
+import {signUp, login, professionalSignUp, userSignUp} from "../middlewares/routes/auth";
 import passport from '../config/passport';
 
 const auth = Router();
 
-auth.post("/users/sign-up", signUp, asyncHandler(Authentication.signUp));
+auth.post("/users/sign-up", userSignUp, asyncHandler(Authentication.signUp));
 auth.post("/users/login", login, asyncHandler(Authentication.login));
 
 auth.post("/professionals/sign-up", professionalSignUp, asyncHandler(Authentication.professionalSignUp));
