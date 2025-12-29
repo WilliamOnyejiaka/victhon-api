@@ -6,7 +6,8 @@ import {
     OneToMany,
     CreateDateColumn,
     Unique,
-    JoinColumn, OneToOne,
+    JoinColumn,
+    OneToOne,
 } from "typeorm";
 import { Booking } from "./Booking";
 import { Transaction } from "./Transaction";

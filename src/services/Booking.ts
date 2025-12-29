@@ -8,7 +8,7 @@ import {HttpStatus, QueueEvents, QueueNames, UserType} from '../types/constants'
 import {Professional} from "../entities/Professional";
 import notify from "./notify";
 import {NotificationType} from "../entities/Notification";
-import {Escrow, EscrowStatus} from "../entities/Escrow";
+import {Escrow, EscrowStatus, RefundStatus} from "../entities/Escrow";
 import {RabbitMQ} from "./RabbitMQ";
 import Payment from "./Payment";
 
@@ -390,7 +390,11 @@ export default class BookingService extends Service {
                 }
 
                 if (booking.escrow.status !== EscrowStatus.PAID) {
-                    throw new Error("Booking cannot be completed, no payment made");
+                    throw new Error("Booking cannot be completed");
+                }
+
+                if (booking.escrow.refundStatus !== RefundStatus.NONE) {
+                    throw new Error("Booking cannot be completed");
                 }
 
                 booking.status = BookingStatus.COMPLETED;

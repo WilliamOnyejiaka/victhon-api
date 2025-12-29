@@ -10,6 +10,7 @@ import {User} from "./User";
 import {Professional} from "./Professional";
 import {Escrow} from "./Escrow";
 import {Wallet} from "./Wallet";
+import { Dispute } from "./Dispute";
 
 export enum TransactionType {
     DEPOSIT = "deposit",
@@ -17,6 +18,7 @@ export enum TransactionType {
     BOOKING_DEPOSIT = "booking_deposit",
     ESCROW_RELEASE = "escrow_release",
     REFUND = "refund",
+    DISPUTE = "dispute",
 }
 
 export enum TransactionStatus {
@@ -80,6 +82,16 @@ export class Transaction {
 
     @Column({ nullable: true })
     walletId?: string;
+
+    @ManyToOne(() => Dispute, (dispute) => dispute.transaction, {
+        nullable: true,
+        onDelete: "SET NULL",
+    })
+    @JoinColumn()
+    disputes?: Dispute;
+
+    @Column({ nullable: true })
+    disputeId?: string;
 
     // Paystack reference
     @Column({nullable: true})

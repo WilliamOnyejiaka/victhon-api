@@ -23,6 +23,7 @@ export enum BookingStatus {
     CANCELLED = "cancelled",
     REJECTED = "rejected",
     REVIEW = "review",
+    DISPUTED = "disputed"
 }
 
 export enum PaymentStatus {

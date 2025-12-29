@@ -22,6 +22,9 @@ export enum NotificationType {
     ESCROW_RELEASE = "escrow_release",
     REVIEW_BOOKING= "review_booking",
     CANCEL_BOOKING = "cancelBooking",
+    REFUNDED_BOOKING = "refundBooking",
+    REFUND_FAILED = "refundFailed",
+    DISPUTED = "disputed"
 }
 
 export enum NotificationStatus {

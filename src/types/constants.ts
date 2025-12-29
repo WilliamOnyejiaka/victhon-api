@@ -243,6 +243,7 @@ export enum QueueEvents {
     PAYMENT_CHARGE_SUCCESSFUL = "payment.charge_successful",
     PAYMENT_BOOK_SUCCESSFUL = "payment.book_successful",
     PAYMENT_REFUND_SUCCESSFUL = "payment.refund_successful",
+    PAYMENT_REFUND_FAILED = "payment.refund_failed",
     WALLET_ESCROW_RELEASE = "wallet.escrow_release",
 };
 

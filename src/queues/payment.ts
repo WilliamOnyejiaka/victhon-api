@@ -34,6 +34,12 @@ payment.route(QueueEvents.PAYMENT_REFUND_SUCCESSFUL, async (message: any, io: Se
     await paymentService.refundSuccessful(reference);
 });
 
+payment.route(QueueEvents.PAYMENT_REFUND_FAILED, async (message: any, io: Server) => {
+    const {payload: {reference}} = message;
+    const paymentService = new Payment();
+    await paymentService.refundFailed(reference);
+});
+
 payment.route(QueueEvents.PAYMENT_BOOK_SUCCESSFUL, async (message: any, io: Server) => {
     const {payload: {transactionId, professionalId}} = message;
 

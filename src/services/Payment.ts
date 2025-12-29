@@ -13,6 +13,7 @@ import {RabbitMQ} from "./RabbitMQ";
 import {In} from "typeorm";
 import notify from "./notify";
 import {NotificationType} from "../entities/Notification";
+import {Dispute} from "../entities/Dispute";
 
 export default class Payment extends BaseService {
 
@@ -20,6 +21,7 @@ export default class Payment extends BaseService {
     private readonly transactionRepo = AppDataSource.getRepository(Transaction);
     private readonly walletRepo = AppDataSource.getRepository(Wallet);
     private readonly escrowRepo = AppDataSource.getRepository(Escrow);
+    private readonly disputeRepo = AppDataSource.getRepository(Dispute);
 
     private readonly PAYSTACK_SECRET_KEY = env(EnvKey.PAYSTACK_SECRET_KEY)!;
 
@@ -164,7 +166,7 @@ export default class Payment extends BaseService {
                     const paystackTx = await this.verifyPaystackTransaction(tx.reference);
 
                     if (paystackTx.status === "success") {
-                        await RabbitMQ.publishToExchange(QueueNames.PAYMENT,  QueueEvents.PAYMENT_CHARGE_SUCCESSFUL, {
+                        await RabbitMQ.publishToExchange(QueueNames.PAYMENT, QueueEvents.PAYMENT_CHARGE_SUCCESSFUL, {
                             eventType: QueueEvents.PAYMENT_CHARGE_SUCCESSFUL,
                             payload: {data: paystackTx},
                         });
@@ -177,7 +179,7 @@ export default class Payment extends BaseService {
 
                 } catch (err) {
                     logger.error(`❌ Error processing tx ${tx.id}`, err);
-                    await this.failTransaction(tx.id,"Error processing tx");
+                    await this.failTransaction(tx.id, "Error processing tx");
                 }
             }
         }
@@ -209,25 +211,6 @@ export default class Payment extends BaseService {
                 await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
             }
         }
-    }
-
-    public async succeedTransaction(
-        tx: Transaction
-    ) {
-
-        await AppDataSource.transaction(async manager => {
-            // 🔐 Idempotency guard
-            const fresh = await manager.findOneBy(Transaction, {id: tx.id});
-            if (!fresh || fresh.status === TransactionStatus.SUCCESS) return;
-
-            // TODO: wallet / escrow logic here
-
-            await manager.update(
-                Transaction,
-                {id: tx.id},
-                {status: TransactionStatus.SUCCESS}
-            );
-        });
     }
 
     public async failTransaction(
@@ -377,6 +360,109 @@ export default class Payment extends BaseService {
         }
     }
 
+    public async dispute(reference: string) {
+        try {
+            const result = await AppDataSource.transaction(async manager => {
+                const transactionRepo = manager.getRepository(Transaction);
+                const escrowRepo = manager.getRepository(Escrow);
+                const walletRepo = manager.getRepository(Wallet);
+                const disputeRepo = manager.getRepository(Dispute);
+                const bookingRepo = manager.getRepository(Booking);
+
+                const transaction = await transactionRepo.findOne({
+                    where: {reference: reference, status: TransactionStatus.SUCCESS},
+                    relations: ['escrow', 'escrow.booking', 'wallet'],
+                    lock: {mode: 'pessimistic_write'},
+                });
+
+                if (!transaction) {
+                    logger.error(`Transaction not found for reference: ${reference}`);
+                    return;
+                }
+
+                const escrow = transaction.escrow;
+
+                if (!escrow) {
+                    logger.error(`Escrow not found for transactionId: ${transaction.id}`);
+                    return;
+                }
+
+                if (escrow.status !== EscrowStatus.PAID) {
+                    logger.error(`Escrow was not PAID for transactionId: ${transaction.id}`);
+                    return;
+                }
+
+                const existingDispute = await transactionRepo.findOne({
+                    where: {
+                        escrowId: escrow.id,
+                        type: TransactionType.DISPUTE,
+                    },
+                    lock: {mode: 'pessimistic_read'},
+                });
+
+                if (existingDispute) {
+                    logger.warn(`Dispute already exists for escrow ${escrow.id}`);
+                    return;
+                }
+
+
+                const disputeTx = transactionRepo.create({
+                    userId: transaction.userId!,
+                    escrowId: transaction.escrow!.id,
+                    amount: transaction.amount,
+                    type: TransactionType.DISPUTE,
+                    status: TransactionStatus.PENDING,
+                    reference: reference,
+                });
+
+                const newDispute = disputeRepo.create({
+                    transactionId: transaction.id,
+                    amount: transaction.amount,
+                    reason: 'Dispute initiated',
+                });
+
+                escrow.status = EscrowStatus.DISPUTED;
+
+                const booking = escrow.booking;
+
+                if (!booking) {
+                    logger.error(`Booking not found for escrow: ${escrow.id}`);
+                    return;
+                }
+
+                const wallet = transaction.wallet;
+
+                if (!wallet) {
+                    logger.error(`Wallet not found for transactionId: ${transaction.id}`);
+                    return;
+                }
+
+
+                booking.status = BookingStatus.CANCELLED;
+                wallet.pendingAmount = Number(wallet.pendingAmount) - Number(transaction.amount);
+                wallet.totalBalance = Number(wallet.balance) + Number(wallet.pendingAmount);
+
+                await manager.save([transaction, disputeTx, escrow, wallet, booking, newDispute]);
+
+                return booking;
+            });
+
+            if (result) {
+                await notify({
+                    userId: result.professionalId,
+                    userType: UserType.PROFESSIONAL,
+                    type: NotificationType.CANCEL_BOOKING,
+                    data: {...result, professional: undefined}
+                });
+            } else {
+                logger.error("Dispute transaction failed")
+            }
+        } catch (error) {
+            console.error(error);
+            return this.handleTypeormError(error);
+        }
+    }
+
     public async refundBooking(bookingId: string, userId: string) {
         try {
             const booking = await this.bookingRepo.findOne({
@@ -386,7 +472,7 @@ export default class Payment extends BaseService {
 
             if (!booking) return this.responseData(404, true, "Booking not found");
             if (booking.status == BookingStatus.COMPLETED) return this.responseData(400, true, "Refund not allowed, booking was completed.");
-            if (booking.escrow.status !== EscrowStatus.PAID) return this.responseData(400, true, "Refund not allowed, booking was not paid for.");
+            if (booking.escrow.status !== EscrowStatus.PAID) return this.responseData(400, true, "Refund not allowed");
             if (booking.escrow.refundStatus !== RefundStatus.NONE && booking.escrow.refundStatus !== RefundStatus.FAILED) return this.responseData(400, true, "Refund not allowed, booking already refunded");
 
             const paymentTx = await this.transactionRepo.findOne({
@@ -438,7 +524,7 @@ export default class Payment extends BaseService {
 
             if (response.status === 200 && response.data.status) {
                 refundTx.status = TransactionStatus.PENDING;
-                booking.status = BookingStatus.CANCELLED;
+                booking.status = BookingStatus.DISPUTED;
 
                 await this.bookingRepo.save(booking);
                 await this.transactionRepo.save(refundTx);
@@ -446,7 +532,7 @@ export default class Payment extends BaseService {
                 await notify({
                     userId: booking.professionalId,
                     userType: UserType.PROFESSIONAL,
-                    type: NotificationType.CANCEL_BOOKING,
+                    type: NotificationType.DISPUTED,
                     data: {...booking, professional: undefined}
                 });
 
@@ -506,6 +592,7 @@ export default class Payment extends BaseService {
                 wallet.totalBalance = Number(wallet.balance) + Number(wallet.pendingAmount);
 
                 escrow.refundStatus = RefundStatus.SUCCESS;
+                escrow.status = EscrowStatus.CANCELLED;
                 refundTx.status = TransactionStatus.SUCCESS;
 
                 await manager.save([wallet, escrow, refundTx]);
@@ -522,6 +609,58 @@ export default class Payment extends BaseService {
             this.handleTypeormError(error);
         }
     }
+
+    public async refundFailed(reference: string) {
+        try {
+            const result = await AppDataSource.transaction(async manager => {
+                const refundTx = await manager.findOne(Transaction, {
+                    where: {
+                        reference,
+                        type: TransactionType.REFUND,
+                    },
+                    relations: ["escrow", "escrow.booking", "escrow.booking.user"],
+                    lock: {mode: "pessimistic_write"},
+                });
+
+                if (!refundTx || refundTx.status === TransactionStatus.SUCCESS) {
+                    return;
+                }
+
+                const escrow = refundTx.escrow;
+                if (!escrow) {
+                    throw new Error("Escrow not found for refund transaction");
+                }
+
+                if (escrow.refundStatus === RefundStatus.SUCCESS) {
+                    logger.info(`Escrow already refunded: ${escrow.id}`);
+                    return null;
+                }
+
+                escrow.refundStatus = RefundStatus.FAILED;
+                refundTx.status = TransactionStatus.FAILED;
+
+                await manager.save([escrow, refundTx]);
+
+                return refundTx;
+            });
+
+            if (result) {
+                await notify({
+                    userId: result.userId,
+                    userType: UserType.USER,
+                    type: NotificationType.REFUND_FAILED,
+                    data: result
+                });
+                logger.info(`💸 Refund completed for transaction:${result.id}}`);
+            } else {
+                logger.info(`💸 Refund failed for reference:${reference}}`);
+            }
+        } catch (error) {
+            console.error(error);
+            this.handleTypeormError(error);
+        }
+    }
+
 
     public async webhook(payload: any, signature: any) {
         const hash = crypto
@@ -541,15 +680,21 @@ export default class Payment extends BaseService {
         switch (event.event) {
             case 'charge.success':
 
-                // eventType = QueueEvents.PAYMENT_CHARGE_SUCCESSFUL
-                // await RabbitMQ.publishToExchange(queueName, eventType, {
-                //     eventType: eventType,
-                //     payload: queuePayload,
-                // });
+                eventType = QueueEvents.PAYMENT_CHARGE_SUCCESSFUL
+                await RabbitMQ.publishToExchange(queueName, eventType, {
+                    eventType: eventType,
+                    payload: queuePayload,
+                });
                 break;
 
             case 'charge.failed':
                 console.log('Payment failed:', event.data.reference);
+                break;
+            case 'charge.dispute.create':
+                break;
+            case 'charge.dispute.remind':
+                break;
+            case 'charge.dispute.resolve':
                 break;
             case 'refund.processed':
                 // await this.refundSuccessful(data);
@@ -562,7 +707,11 @@ export default class Payment extends BaseService {
                 break;
 
             case 'refund.failed':
-                console.log('Refund failed:', event.data.reference);
+                eventType = QueueEvents.PAYMENT_REFUND_FAILED
+                await RabbitMQ.publishToExchange(queueName, eventType, {
+                    eventType: eventType,
+                    payload: {reference: data.transaction_reference},
+                });
                 break;
             case 'subscription.create':
             case 'invoice.payment_failed':

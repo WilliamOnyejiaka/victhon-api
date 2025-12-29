@@ -85,8 +85,8 @@ export const editProfessionalValidator = [
         .withMessage("isActive must be a boolean"),
 
     // 📍 Longitude & Latitude must come together
-    body('latitude').isFloat({ min: -90, max: 90 }).withMessage('Invalid latitude'),
-    body('longitude').isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude'),
+    body('latitude').optional().isFloat({ min: -90, max: 90 }).withMessage('Invalid latitude'),
+    body('longitude').optional().isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude'),
 
     body()
         .custom((_, { req }) => {

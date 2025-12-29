@@ -1,20 +1,21 @@
-import {Server} from "socket.io";
+import { Server } from "socket.io";
 import RabbitMQRouter from "../utils/RabbitMQRouter";
 import notify from "../services/notify";
 import BaseService from "../services/Service";
-import {QueueEvents, QueueNames} from "../types/constants";
-import {exchange} from "../types";
+import { QueueEvents, QueueNames } from "../types/constants";
+import { exchange } from "../types";
 import logger from "../config/logger";
 import UserCache from "../cache/UserCache";
-import {UserType} from "../types/constants";
+import { UserType } from "../types/constants";
 import Payment from "../services/Payment";
-import {NotificationType} from "../entities/Notification";
-import {AppDataSource} from "../data-source";
-import {Transaction, TransactionStatus, TransactionType} from "../entities/Transaction";
-import {Booking, BookingStatus} from "../entities/Booking";
-import {In, LessThanOrEqual, MoreThanOrEqual, Not} from "typeorm";
-import {Wallet} from "../entities/Wallet";
-import {Escrow} from "../entities/Escrow";
+import { NotificationType } from "../entities/Notification";
+import { AppDataSource } from "../data-source";
+import { Transaction, TransactionStatus, TransactionType } from "../entities/Transaction";
+import { Booking, BookingStatus } from "../entities/Booking";
+import { In, LessThanOrEqual, MoreThanOrEqual, Not } from "typeorm";
+import { Wallet } from "../entities/Wallet";
+import { Escrow } from "../entities/Escrow";
+import env, { EnvKey } from "../config/env";
 
 const service = new BaseService();
 
@@ -27,12 +28,13 @@ const wallet = new RabbitMQRouter({
 });
 
 wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
-    const {escrowId, professionalId, walletId} = message.payload;
+    const { escrowId, professionalId, walletId } = message.payload;
+    const platFormFeePercent = parseFloat(env(EnvKey.PLATFORM_FEE_PERCENT)!);
 
     try {
         const result = await AppDataSource.transaction(async manager => {
             const escrow = await manager.findOne(Escrow, {
-                where: {id: escrowId},
+                where: { id: escrowId },
             });
 
             if (!escrow) {
@@ -41,8 +43,8 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
 
             // 🔒 lock wallet
             const wallet = await manager.findOne(Wallet, {
-                where: {id: walletId},
-                lock: {mode: "pessimistic_write"},
+                where: { id: walletId },
+                lock: { mode: "pessimistic_write" },
             });
 
             if (!wallet) {
@@ -66,11 +68,13 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
             }
 
             const newPending = Number(wallet.pendingAmount) - Number(escrow.amount);
-            const newBalance = Number(wallet.balance) + Number(escrow.amount);
+            const platformFee = (Number(escrow.amount) * platFormFeePercent) / 100;
+            // const newBalance = Number(wallet.balance) + Number(escrow.amount);
+            const newBalance = Number(wallet.balance) + (Number(escrow.amount) - platformFee);
 
             await manager.update(
                 Wallet,
-                {id: wallet.id},
+                { id: wallet.id },
                 {
                     pendingAmount: newPending,
                     balance: newBalance,

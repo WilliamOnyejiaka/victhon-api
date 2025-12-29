@@ -24,7 +24,8 @@ export enum EnvKey {
     MAIN_API = 'mainApi',
     BATCH_SIZE = 'batchSize',
     RABBIT_MQ = 'rabbitMQ',
-    PAYSTACK_SECRET_KEY = 'paystackSecret'
+    PAYSTACK_SECRET_KEY = 'paystackSecret',
+    PLATFORM_FEE_PERCENT = 'platformFeePercent',
 }
 
 export default function env(key: EnvKey): string | undefined {
@@ -50,7 +51,8 @@ export default function env(key: EnvKey): string | undefined {
         [EnvKey.MAIN_API]: process.env.MAIN_API,
         [EnvKey.BATCH_SIZE]: process.env.BATCH_SIZE,
         [EnvKey.RABBIT_MQ]: process.env.RABBITMQ_URL!,
-        [EnvKey.PAYSTACK_SECRET_KEY]: process.env.PAYSTACK_SECRET_KEY,
+        [EnvKey.PAYSTACK_SECRET_KEY]: process.env.PAYSTACK_SECRET_KEY!,
+        [EnvKey.PLATFORM_FEE_PERCENT]: process.env.PLATFORM_FEE_PERCENT!,
     };
     return envValues[key];
 }
