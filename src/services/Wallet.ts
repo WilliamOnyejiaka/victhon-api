@@ -9,11 +9,27 @@ export default class Wallet extends Service {
 
     private readonly repo = AppDataSource.getRepository(Entity);
     private readonly transactionRepo = AppDataSource.getRepository(Transaction);
+    private readonly professionalRepo = AppDataSource.getRepository(Professional);
+
 
     public async wallet(userId: string) {
         try {
             const result = await this.repo.findOne({where: {professionalId: userId}});
             return this.responseData(200, false, "Wallet was retrieved successfully", result);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async transaction(professionalId: string, transactionId: string) {
+        try {
+            const professional = await this.professionalRepo.findOne({where: {id: professionalId},relations: ['wallet']});
+            if (!professional) return this.responseData(404, false, "Professional was not found");
+            const wallet = professional.wallet;
+            if(!wallet) return this.responseData(404, false, "Wallet was not found");
+            const result = await this.transactionRepo.findOne({where: {walletId: wallet.id,id: transactionId}});
+            if (!result) return this.responseData(404, false, "Transaction was not found");
+            return this.responseData(200, false, "Transaction was retrieved successfully", result);
         } catch (error) {
             return this.handleTypeormError(error);
         }

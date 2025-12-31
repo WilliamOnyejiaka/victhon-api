@@ -324,18 +324,6 @@ export default class Payment extends BaseService {
                             professionalId: escrow.booking.professionalId
                         }
                     };
-
-
-                    // const payload = {
-                    //     transactionId: transactionId,
-                    //     professionalId: escrow.booking.professionalId
-                    // };
-                    // const queueName = QueueNames.PAYMENT;
-                    // const eventType = QueueEvents.PAYMENT_BOOK_SUCCESSFUL
-                    // await RabbitMQ.publishToExchange(queueName, eventType, {
-                    //     eventType: eventType,
-                    //     payload,
-                    // });
                 }
 
                 logger.info(`🤑 Payment successfully processed for transaction: ${transactionId}`);
@@ -364,10 +352,7 @@ export default class Payment extends BaseService {
         try {
             const result = await AppDataSource.transaction(async manager => {
                 const transactionRepo = manager.getRepository(Transaction);
-                const escrowRepo = manager.getRepository(Escrow);
-                const walletRepo = manager.getRepository(Wallet);
                 const disputeRepo = manager.getRepository(Dispute);
-                const bookingRepo = manager.getRepository(Booking);
 
                 const transaction = await transactionRepo.findOne({
                     where: {reference: reference, status: TransactionStatus.SUCCESS},
@@ -734,26 +719,26 @@ export default class Payment extends BaseService {
     }
 
 
-    // public async withdraw(userId: string, amount: number) {
-    //     try {
-    //         const response = await axios.post(
-    //             'https://api.paystack.co/transferrecipient',
-    //             {
-    //                 name: string,
-    //                 account_number: string;
-    //                 bank_code: string;
-    //             },
-    //             {
-    //                 headers: {
-    //                     Authorization: `Bearer ${this.PAYSTACK_SECRET_KEY}`,
-    //                     'Content-Type': 'application/json'
-    //                 }
-    //             }
-    //         );
-    //     } catch (error) {
-    //
-    //     }
-    // }
+    public async withdraw(userId: string, amount: number) {
+        try {
+            // const response = await axios.post(
+            //     'https://api.paystack.co/transferrecipient',
+            //     {
+            //         name: string,
+            //         account_number: string;
+            //         bank_code: string;
+            //     },
+            //     {
+            //         headers: {
+            //             Authorization: `Bearer ${this.PAYSTACK_SECRET_KEY}`,
+            //             'Content-Type': 'application/json'
+            //         }
+            //     }
+            // );
+        } catch (error) {
+    
+        }
+    }
 
     async verifyBookingTransaction(bookingId: string, userId: string) {
         try {

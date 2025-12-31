@@ -7,20 +7,20 @@ import verifyJWT from '../verifyJWT';
 
 export const add = [
     verifyJWT([UserType.PROFESSIONAL]),
-    uploads(ResourceType.IMAGE).array('images',5),
+    uploads(ResourceType.IMAGE).array('images', 5),
     body("name")
         .isString()
-        .isLength({ min: 1, max: 50 })
+        .isLength({min: 1, max: 50})
         .withMessage("Name must be a string and max 50 characters"),
 
     body("category")
         .isString()
-        .isLength({ min: 1, max: 80 })
+        .isLength({min: 1, max: 80})
         .withMessage("Category must be a string and max 80 characters"),
 
     body("description")
         .isString()
-        .isLength({ min: 1, max: 80 })
+        .isLength({min: 1, max: 80})
         .withMessage("Description must be a string and max 80 characters"),
 
     body("price")
@@ -38,7 +38,7 @@ export const add = [
     body("address")
         .optional()
         .isString()
-        .isLength({ max: 100 })
+        .isLength({max: 100})
         .withMessage("Address must be a string and max 100 characters"),
 
     body("remoteLocationService")
@@ -75,7 +75,7 @@ export const packageValidator = [
 ];
 
 export const packagesValidator = [
-    verifyJWT([UserType.PROFESSIONAL,UserType.USER]),
+    verifyJWT([UserType.PROFESSIONAL, UserType.USER]),
     param("professionalId")
         .isUUID()
         .withMessage("Invalid professional Id (must be a UUID)"),
@@ -90,40 +90,61 @@ export const deleteValidator = [
     handleValidationErrors
 ];
 
-export const updatePackageValidator = [
+export const updateServiceValidator = [
     verifyJWT([UserType.PROFESSIONAL]),
-    param('id')
-        .exists().withMessage('Package ID is required')
-        .isUUID().withMessage('Package ID must be a valid UUID'),
 
-    body('name')
-        .optional()
-        .isString().withMessage('Name must be a string')
-        .isLength({ min: 3 }).withMessage('Name must be at least 3 characters'),
+    // identifiers
+    param("id")
+        .isUUID()
+        .withMessage("Service id must be a valid UUID"),
 
-    body('description')
+    // fields being updated (all optional)
+    body("name")
         .optional()
-        .isString().withMessage('Description must be a string')
-        .isLength({ min: 5 }).withMessage('Description must be at least 5 characters'),
+        .isString()
+        .isLength({min: 2, max: 100})
+        .withMessage("Name must be between 2 and 100 characters"),
 
-    body('price')
+    body("description")
         .optional()
-        .isFloat({ gt: 0 }).withMessage('Price must be a positive number'),
+        .isString()
+        .isLength({min: 5, max: 1000})
+        .withMessage("Description must be between 5 and 1000 characters"),
 
-    body('type')
+    body("category")
         .optional()
-        .isIn(['basic', 'premium', 'custom']).withMessage('Type must be one of: basic, premium, custom'),
+        .isString()
+        .withMessage("Category must be a string"),
 
-    body('addOns')
+    body("price")
         .optional()
-        .isArray().withMessage('addOns must be an array')
-        .custom((value) => {
-            for (const item of value) {
-                if (typeof item.name !== 'string' || typeof item.price !== 'number') {
-                    throw new Error('Each addOn must have a name (string) and price (number)');
-                }
-            }
-            return true;
-        }),
+        .isFloat({min: 0})
+        .withMessage("Price must be a positive number"),
+
+    body("hourlyPrice")
+        .optional()
+        .isFloat({min: 0})
+        .withMessage("Hourly price must be a positive number"),
+
+    body("address")
+        .optional()
+        .isString()
+        .isLength({min: 3, max: 255})
+        .withMessage("Address must be valid"),
+
+    body("remoteLocationService")
+        .optional()
+        .isBoolean()
+        .withMessage("remoteLocationService must be boolean"),
+
+    body("onsiteLocationService")
+        .optional()
+        .isBoolean()
+        .withMessage("onsiteLocationService must be boolean"),
+
+    body("storeLocationService")
+        .optional()
+        .isBoolean()
+        .withMessage("storeLocationService must be boolean"),
     handleValidationErrors
 ];

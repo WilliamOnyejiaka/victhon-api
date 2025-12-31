@@ -41,9 +41,8 @@ export default class Package {
     public static async update(req: Request, res: Response) {
         const { id: professionalId } = res.locals.data;
         const { id } = req.params;
-        const { name, description, price, type, addOns } = req.body;
 
-        const serviceResult = await Package.service.update(id!, name, professionalId, description, price, type, addOns);
+        const serviceResult = await Package.service.update({id, professionalId,...req.body});
 
         Controller.response(res, serviceResult);
     }
