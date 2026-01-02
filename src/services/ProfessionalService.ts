@@ -38,7 +38,7 @@ export default class ProfessionalService extends Service {
         }
     }
 
-    public async package(
+    public async service(
         userId: string,
         id: string
     ) {
@@ -49,9 +49,7 @@ export default class ProfessionalService extends Service {
             if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
 
             const result = await this.repo.findOne({where: {id, professionalId: userId}});
-            if (!result) {
-                return this.responseData(HttpStatus.NOT_FOUND, true, "Service not found.");
-            }
+            if (!result) return this.responseData(HttpStatus.NOT_FOUND, true, "Service not found.");
 
             return this.responseData(HttpStatus.OK, false, `Service was retrieved successfully.`, result);
         } catch (error) {
@@ -59,7 +57,7 @@ export default class ProfessionalService extends Service {
         }
     }
 
-    public async packages(professionalId: string, page: number, limit: number) {
+    public async professionalServices(professionalId: string, page: number, limit: number) {
         try {
             const skip = (page - 1) * limit;
 

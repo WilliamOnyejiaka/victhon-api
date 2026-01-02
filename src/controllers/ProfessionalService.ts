@@ -22,7 +22,7 @@ export default class Package {
     public static async package(req: Request, res: Response) {
         const { id, professionalId } = req.params;
 
-        const serviceResult = await Package.service.package(professionalId!, id!);
+        const serviceResult = await Package.service.service(professionalId!, id!);
         Controller.response(res, serviceResult);
     }
 
@@ -33,7 +33,7 @@ export default class Package {
         const parsedPage = parseInt(page as string) || 1;
         const parsedLimit = parseInt(limit as string) || 10;
 
-        const serviceResult = await Package.service.packages(professionalId!, parsedPage, parsedLimit);
+        const serviceResult = await Package.service.professionalServices(professionalId!, parsedPage, parsedLimit);
 
         Controller.response(res, serviceResult);
     }
