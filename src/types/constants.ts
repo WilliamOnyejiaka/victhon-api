@@ -47,7 +47,7 @@ export enum ResourceType {
 export enum CdnFolders {
     PROFILEPICTURE = "victhon-cdn/profile-pictures/users",
     USERPICTURES = "victhon-cdn/profile-pictures/users/pictures",
-    WORK_GALLERY = "victhon-cdn/professionals/gallery"
+    SERVICES = "victhon-cdn/professionals/services"
 
 }
 

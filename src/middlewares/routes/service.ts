@@ -1,4 +1,3 @@
-// @ts-ignore
 import {body, param} from 'express-validator';
 import {handleValidationErrors} from "../validators";
 import {ResourceType, UserType} from "../../types/constants";
@@ -7,7 +6,7 @@ import verifyJWT from '../verifyJWT';
 
 export const add = [
     verifyJWT([UserType.PROFESSIONAL]),
-    uploads(ResourceType.IMAGE).array('images', 5),
+    uploads(ResourceType.IMAGE).array('images', 6),
     body("name")
         .isString()
         .isLength({min: 1, max: 50})
@@ -72,6 +71,10 @@ export const packageValidator = [
         .withMessage("Invalid package Id (must be a UUID)"),
 
     handleValidationErrors
+];
+
+export const allServices = [
+    verifyJWT([UserType.USER]),
 ];
 
 export const packagesValidator = [

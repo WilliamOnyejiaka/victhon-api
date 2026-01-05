@@ -1,24 +1,42 @@
 import {AppDataSource} from "../data-source";
 import {Professional} from "../entities/Professional";
-import {HttpStatus} from "../types/constants";
+import {CdnFolders, HttpStatus, ResourceType} from "../types/constants";
 import Service from "./Service";
 import {ServiceEntity} from "../entities/ServiceEntity";
 import {DeepPartial} from "typeorm";
+import Cloudinary from "./Cloudinary";
+import {FailedFiles, UploadedFiles} from "../types";
 
 export default class ProfessionalService extends Service {
 
     private readonly repo = AppDataSource.getRepository(ServiceEntity);
+    private readonly professionalRepo = AppDataSource.getRepository(Professional);
+
 
     public async add(payload: any) {
         try {
-            const userRepo = AppDataSource.getRepository(Professional);
 
-            let user = await userRepo.findOne({where: {id: payload.userId}});
-            if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
+            let professional = await this.professionalRepo.findOne({where: {id: payload.userId}});
+            if (!professional) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
 
-            const serviceRepo = AppDataSource.getRepository(ServiceEntity);
+            let images: { url: string, publicId: string }[] = [];
 
-            const newService = serviceRepo.create({
+            if (payload.files) {
+                const cloudinary = new Cloudinary();
+
+                let uploadedFiles: UploadedFiles[] = [], publicIds: string[] = [], failedFiles: FailedFiles[] = [];
+                ({
+                    uploadedFiles,
+                    failedFiles,
+                    publicIds
+                } = await cloudinary.uploadV2(payload.files, ResourceType.IMAGE, CdnFolders.SERVICES));
+                if (failedFiles?.length > 0) return this.responseData(500, true, "File uploads failed", failedFiles);
+
+                images = uploadedFiles.map((upload) => ({url: upload.url, publicId: upload.publicId}));
+            }
+
+
+            const newService = this.repo.create({
                 name: payload.name,
                 professionalId: payload.userId,
                 description: payload.description,
@@ -26,13 +44,14 @@ export default class ProfessionalService extends Service {
                 price: payload.price,
                 hourlyPrice: payload.hourlyPrice ?? 0,
                 address: payload.address,
+                images: images,
                 remoteLocationService: payload.remoteLocationService ?? false,
                 onsiteLocationService: payload.onsiteLocationService ?? false,
                 storeLocationService: payload.storeLocationService ?? false
             });
 
-            const data = await serviceRepo.save(newService);
-            return this.responseData(201, false, "Package has been created", data)
+            const data = await this.repo.save(newService);
+            return this.responseData(201, false, "Service has been created successfully", data)
         } catch (error) {
             return this.handleTypeormError(error);
         }
@@ -63,6 +82,27 @@ export default class ProfessionalService extends Service {
 
             const [records, total] = await this.repo.findAndCount({
                 where: {professionalId: professionalId},
+                skip,
+                take: limit,
+                order: {updatedAt: "DESC"},
+            });
+
+            const data = {
+                records: records,
+                pagination: this.pagination(page, limit, total),
+            }
+
+            return this.responseData(200, false, "Services have been retrieved successfully", data)
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async allServices(page: number, limit: number) {
+        try {
+            const skip = (page - 1) * limit;
+
+            const [records, total] = await this.repo.findAndCount({
                 skip,
                 take: limit,
                 order: {updatedAt: "DESC"},
