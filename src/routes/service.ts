@@ -14,6 +14,7 @@ const packageRoute = Router();
 
 packageRoute.post("/", add, asyncHandler(Controller.add));
 packageRoute.get("/", allServices, asyncHandler(Controller.allServices));
+packageRoute.get("/nearBy", allServices, asyncHandler(Controller.nearByProfessionals));
 packageRoute.get("/:professionalId", packagesValidator, asyncHandler(Controller.packages));
 packageRoute.get("/:professionalId/:id", packageValidator, asyncHandler(Controller.package));
 packageRoute.put("/:id", updateServiceValidator, asyncHandler(Controller.update));

@@ -50,6 +50,21 @@ export default class Package {
         Controller.response(res, serviceResult);
     }
 
+    public static async nearByProfessionals(req: Request, res: Response) {
+        let {page, limit, radius} = req.query;
+
+        const parsedPage = parseInt(page as string) || 1;
+        const parsedLimit = parseInt(limit as string) || 10;
+        const parsedRadius = parseInt(radius as string) || 10;
+
+        const lon = 3.3792;
+        const lat = 6.5244;
+
+        const serviceResult = await Package.service.nearByProfessionals(lon,lat,parsedRadius, parsedPage, parsedLimit);
+
+        Controller.response(res, serviceResult);
+    }
+
     public static async update(req: Request, res: Response) {
         const {id: professionalId} = res.locals.data;
         const {id} = req.params;

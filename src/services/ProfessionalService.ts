@@ -119,6 +119,134 @@ export default class ProfessionalService extends Service {
         }
     }
 
+    public async nearByProfessionals(longitude: number, latitude: number, radiusKm: number = 10, page: number = 1, limit: number = 10) {
+        try {
+            // Safety guards
+            const safePage = Math.max(page, 1);
+            const safeLimit = Math.min(Math.max(limit, 1), 50);
+            const offset = (safePage - 1) * safeLimit;
+
+            const radiusInMeters = radiusKm * 1000;
+
+            /* -----------------------------
+               Bounding box calculation - less expensive than the actual distance
+            ------------------------------*/
+            const earthRadius = 6371000; // meters
+
+            const latDelta = (radiusInMeters / earthRadius) * (180 / Math.PI);
+            const lngDelta =
+                latDelta / Math.cos((latitude * Math.PI) / 180);
+
+            const minLat = latitude - latDelta;
+            const maxLat = latitude + latDelta;
+            const minLng = longitude - lngDelta;
+            const maxLng = longitude + lngDelta;
+
+            const repo = AppDataSource.getRepository(Professional);
+
+            const qb = repo
+                .createQueryBuilder("professional")
+                .addSelect(
+                    `
+                          ST_Distance_Sphere(
+                            professional.location,
+                            ST_GeomFromText('POINT(${longitude} ${latitude})', 4326)
+                          )
+                          `,
+                    "distance"
+                )
+                // 1️⃣ Spatial index filter (FAST)
+                .where(
+                    `
+                              MBRContains(
+                                ST_GeomFromText(
+                                  'POLYGON((
+                                    ${minLng} ${minLat},
+                                    ${maxLng} ${minLat},
+                                    ${maxLng} ${maxLat},
+                                    ${minLng} ${maxLat},
+                                    ${minLng} ${minLat}
+                                  ))',
+                                  4326
+                                ),
+                                professional.location
+                              )
+                              `
+                )
+                // 2️⃣ Accurate distance filter
+                .andWhere(
+                    `
+                              ST_Distance_Sphere(
+                                professional.location,
+                                ST_GeomFromText('POINT(${longitude} ${latitude})', 4326)
+                              ) <= :radius
+                              `
+                )
+                .andWhere("professional.isActive = true")
+                .andWhere("professional.availability = true")
+                .setParameter("radius", radiusInMeters)
+                .orderBy("distance", "ASC")
+                .skip(offset)
+                .take(safeLimit);
+
+            /* -----------------------------
+               Execute queries
+            ------------------------------*/
+            const [result, total] = await Promise.all([
+                qb.getRawAndEntities(),
+                qb.clone().skip(undefined).take(undefined).getCount(),
+            ]);
+
+            /* -----------------------------
+               Attach distance to entities
+            ------------------------------*/
+            const professionals = result.entities.map((pro, index) => ({
+                ...pro,
+                distance: Number(result.raw[index].distance), // meters
+            }));
+
+            const data = {
+                records: professionals,
+                pagination: this.pagination(page, limit, total),
+            }
+            return this.responseData(200, false, "Professionals have been retrieved successfully", data)
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    private async massImageDelete(publicIds: string[]) {
+        const results: { publicId: string, success: boolean }[] = [];
+
+        await Promise.all(
+            publicIds.map(async (publicId: string) => {
+                const cloudinary = new Cloudinary();
+                const result = await cloudinary.delete(publicId);
+                if (result.statusCode == 500) {
+                    results.push({
+                        success: false,
+                        publicId,
+                    });
+                } else {
+                    results.push({
+                        success: true,
+                        publicId,
+                    });
+                }
+            })
+        );
+
+        const success: string[] = results
+            .filter((result) => result.success)
+            .map((result) => result.publicId);
+        const failed: string[] = results
+            .filter((result) => !result.success)
+            .map((result) => result.publicId);
+
+        return {success, failed};
+    }
+
+
     public async update(
         payload: any
     ) {
