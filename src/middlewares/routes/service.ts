@@ -1,4 +1,4 @@
-import {body, param} from 'express-validator';
+import {body, param, query} from 'express-validator';
 import {handleValidationErrors} from "../validators";
 import {ResourceType, UserType} from "../../types/constants";
 import uploads from '../multer';
@@ -56,6 +56,82 @@ export const add = [
         .withMessage("storeLocationService must be boolean")
         .toBoolean(),
     handleValidationErrors
+];
+
+export const validateServiceSearch = [
+    verifyJWT([UserType.USER]),
+    query("name")
+        .optional()
+        .isString()
+        .withMessage("name must be a string"),
+
+    // Category filter: optional string
+    query("category")
+        .optional()
+        .isString()
+        .withMessage("category must be a string"),
+
+    // Description filter: optional string
+    query("description")
+        .optional()
+        .isString()
+        .withMessage("description must be a string"),
+
+    // minPrice: optional decimal >= 0
+    query("minPrice")
+        .optional()
+        .isFloat({ min: 0 })
+        .withMessage("minPrice must be a positive number")
+        .toFloat(),
+
+    // maxPrice: optional decimal >= 0
+    query("maxPrice")
+        .optional()
+        .isFloat({ min: 0 })
+        .withMessage("maxPrice must be a positive number")
+        .toFloat(),
+
+    // remote: optional boolean
+    query("remote")
+        .optional()
+        .isBoolean()
+        .withMessage("remote must be true or false")
+        .toBoolean(),
+
+    // onsite: optional boolean
+    query("onsite")
+        .optional()
+        .isBoolean()
+        .withMessage("onsite must be true or false")
+        .toBoolean(),
+
+    // store: optional boolean
+    query("store")
+        .optional()
+        .isBoolean()
+        .withMessage("store must be true or false")
+        .toBoolean(),
+
+    // professionalId: optional UUID string
+    query("professionalId")
+        .optional()
+        .isUUID()
+        .withMessage("professionalId must be a valid UUID"),
+
+    // limit: optional integer >= 1, default 10
+    query("limit")
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage("limit must be an integer greater than 0")
+        .toInt(),
+
+    // page: optional integer >= 1, default 1
+    query("page")
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage("page must be an integer greater than 0")
+        .toInt(),
+    handleValidationErrors,
 ];
 
 

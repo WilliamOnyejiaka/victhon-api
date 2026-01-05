@@ -60,7 +60,42 @@ export default class Package {
         const lon = 3.3792;
         const lat = 6.5244;
 
-        const serviceResult = await Package.service.nearByProfessionals(lon,lat,parsedRadius, parsedPage, parsedLimit);
+        const serviceResult = await Package.service.nearByProfessionals(lon, lat, parsedRadius, parsedPage, parsedLimit);
+
+        Controller.response(res, serviceResult);
+    }
+
+    public static async searchServices(req: Request, res: Response) {
+        // Parse query parameters with defaults
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+
+        const name = req.query.name as string | undefined;
+        const category = req.query.category as string | undefined;
+        const description = req.query.description as string | undefined;
+
+        const minPrice = req.query.minPrice !== undefined ? parseFloat(req.query.minPrice as string) : undefined;
+        const maxPrice = req.query.maxPrice !== undefined ? parseFloat(req.query.maxPrice as string) : undefined;
+
+        const remote = req.query.remote !== undefined ? req.query.remote === 'true' : undefined;
+        const onsite = req.query.onsite !== undefined ? req.query.onsite === 'true' : undefined;
+        const store = req.query.store !== undefined ? req.query.store === 'true' : undefined;
+
+        const professionalId = req.query.professionalId as string | undefined;
+
+        const serviceResult = await Package.service.searchServices({
+            name,
+            category,
+            description,
+            minPrice,
+            maxPrice,
+            remote,
+            onsite,
+            store,
+            professionalId,
+            page,
+            limit
+        });
 
         Controller.response(res, serviceResult);
     }

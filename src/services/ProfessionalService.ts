@@ -7,6 +7,20 @@ import {DeepPartial} from "typeorm";
 import Cloudinary from "./Cloudinary";
 import {FailedFiles, UploadedFiles} from "../types";
 
+interface ServiceSearchOptions {
+    name?: string | undefined;
+    category?: string | undefined;
+    description?: string | undefined;
+    minPrice?: number | undefined;
+    maxPrice?: number | undefined;
+    remote?: boolean | undefined;
+    onsite?: boolean | undefined;
+    store?: boolean | undefined;
+    professionalId?: string | undefined;
+    limit?: number | undefined;
+    page?: number | undefined;
+}
+
 export default class ProfessionalService extends Service {
 
     private readonly repo = AppDataSource.getRepository(ServiceEntity);
@@ -209,8 +223,77 @@ export default class ProfessionalService extends Service {
                 records: professionals,
                 pagination: this.pagination(page, limit, total),
             }
-            return this.responseData(200, false, "Professionals have been retrieved successfully", data)
+            return this.responseData(200, false, "Professionals have been retrieved successfully", data);
         } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+
+    public async searchServices(
+        options: ServiceSearchOptions
+    ) {
+        try {
+            const {
+                name,
+                category,
+                description,
+                minPrice,
+                maxPrice,
+                remote,
+                onsite,
+                store,
+                professionalId,
+                limit = 10,
+                page = 1
+            } = options
+
+            const query = this.repo.createQueryBuilder("service");
+
+            // Dynamic filters: only add them if present
+            if (name) {
+                query.orWhere("service.name LIKE :name", { name: `%${name}%` });
+            }
+
+            if (category) {
+                query.orWhere("service.category LIKE :category", { category: `%${category}%` });
+            }
+
+            if (description) {
+                query.orWhere("service.description LIKE :description", { description: `%${description}%` });
+            }
+
+            // Price range filter
+            if (minPrice !== undefined) {
+                query.andWhere("service.price >= :minPrice", {minPrice});
+            }
+            if (maxPrice !== undefined) {
+                query.andWhere("service.price <= :maxPrice", {maxPrice});
+            }
+
+            // Service type filters
+            if (remote !== undefined) query.andWhere("service.remoteLocationService = :remote", {remote});
+            if (onsite !== undefined) query.andWhere("service.onsiteLocationService = :onsite", {onsite});
+            if (store !== undefined) query.andWhere("service.storeLocationService = :store", {store});
+
+            // Filter by professional
+            if (professionalId) query.andWhere("service.professionalId = :professionalId", {professionalId});
+
+            // Pagination
+            const offset = (page - 1) * limit;
+            query.skip(offset).take(limit);
+
+            // Sorting by latest updated
+            query.orderBy("service.updatedAt", "DESC");
+
+            const [services, total] = await query.getManyAndCount();
+
+            const data = {
+                records: services,
+                pagination: this.pagination(page, limit, total),
+            }
+            return this.responseData(200, false, "Services have been retrieved successfully", data)
+        }catch (error) {
             return this.handleTypeormError(error);
         }
     }
