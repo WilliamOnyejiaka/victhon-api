@@ -11,7 +11,12 @@ export default class Review extends Service {
     private readonly repo = AppDataSource.getRepository(Entity);
     private readonly ratingAggRepo = AppDataSource.getRepository(RatingAggregate);
 
-    public async create(userId: string, professionalId: string, rating: number, text: string) {
+    public async createReview(
+        userId: string,
+        professionalId: string,
+        rating: number,
+        text: string
+    ) {
         try {
             const data = await AppDataSource.transaction(async (manager) => {
                 const existingProfessional = await manager.findOne(Professional, {
@@ -22,6 +27,15 @@ export default class Review extends Service {
                     throw new Error('Professional was not found');
                 }
 
+                // 2. Prevent duplicate reviews (VERY IMPORTANT)
+                const existingReview = await manager.findOne(Entity, {
+                    where: { userId, professionalId },
+                });
+
+                if (existingReview) {
+                    throw new Error("You have already reviewed this professional");
+                }
+
                 const review = manager.create(Entity, {
                     userId,
                     professionalId,
@@ -29,10 +43,46 @@ export default class Review extends Service {
                     rating
                 });
 
-                return await manager.save(review);
-            });
+                let agg = await manager.createQueryBuilder(RatingAggregate, "agg")
+                    .setLock("pessimistic_write")
+                    .where("agg.professionalId = :professionalId", { professionalId })
+                    .getOne();
 
-            await Queues.updateRatingAgg.add('updateRatingAgg', { professionalId }, { jobId: `send-${Date.now()}`, priority: 1 });
+                if (!agg) {
+                    // First review
+                    agg = manager.create(RatingAggregate, {
+                        professionalId,
+                        total: 1,
+                        ratingSum: rating,
+                        average: rating,
+                        ratingDistribution: {
+                            1: rating === 1 ? 1 : 0,
+                            2: rating === 2 ? 1 : 0,
+                            3: rating === 3 ? 1 : 0,
+                            4: rating === 4 ? 1 : 0,
+                            5: rating === 5 ? 1 : 0,
+                        },
+                    });
+                } else {
+                    agg.total += 1;
+                    agg.ratingSum += rating;
+                    agg.average = Number((agg.ratingSum / agg.total).toFixed(2));
+
+                    const dist = agg.ratingDistribution as Record<number, number>;
+                    dist[rating] = (dist[rating] || 0) + 1;
+                    agg.ratingDistribution = dist as any;
+                }
+
+
+                // 6. Persist changes
+                await manager.save(agg);
+                const savedReview = await manager.save(review);
+
+                return {
+                    review: savedReview,
+                    aggregate: agg,
+                };
+            });
 
             return this.responseData(201, false, "Review was created successfully", data);
         } catch (error) {
@@ -67,36 +117,4 @@ export default class Review extends Service {
             return this.handleTypeormError(error);
         }
     }
-
-    public async updateProfessionalRating(professionalId: string) {
-        try {
-            const result = await this.repo
-                .createQueryBuilder("reviews")
-                .select("reviews.rating", "rating")
-                .addSelect("COUNT(*)", "total")
-                .where("reviews.professionalId = :professionalId", { professionalId })
-                .groupBy("reviews.rating")
-                .getRawMany();
-
-            const totalSum = result.reduce((sum, r) => sum + Number(r.rating) * Number(r.total), 0);
-            const total = result.reduce((sum, r) => sum + Number(r.total), 0);
-            const avg = total === 0 ? 0 : totalSum / total;
-
-            const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-            for (const r of result) distribution[r.rating] = Number(r.total);
-
-            await this.ratingAggRepo.upsert(
-                {
-                    professionalId,
-                    average: Number(avg.toFixed(2)),
-                    total,
-                    ratingDistribution: distribution as any,
-                },
-                ["professionalId"]
-            );
-        } catch (error) {
-            this.handleTypeormError(error);
-        }
-    }
-
 }

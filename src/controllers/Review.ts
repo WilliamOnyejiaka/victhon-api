@@ -10,7 +10,7 @@ export default class Review {
         const { id: userId } = res.locals.data;
         const { rating, text, professionalId } = req.body;
 
-        const serviceResult = await Review.service.create(userId, professionalId, parseInt(rating), text);
+        const serviceResult = await Review.service.createReview(userId, professionalId, parseInt(rating), text);
 
         Controller.response(res, serviceResult);
     }
