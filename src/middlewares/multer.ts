@@ -78,7 +78,7 @@ export const mediaUpload = (maxFiles: number = 6) => {
         storage: storage,
         limits: { fileSize: 100 * 1024 * 1024, files: maxFiles },
         fileFilter: (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
-            const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'video/mp4', 'video/webm','video/mpeg'];
+            const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'video/mp4', 'video/webm','video/mpeg',"application/pdf"];
             if (!allowedMimeTypes.includes(file.mimetype)) {
                 return cb(new Error(typeError));
             }

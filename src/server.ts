@@ -10,6 +10,8 @@ import {IWorker, WorkerConfig} from "./types";
 import {RabbitMQ} from "./services/RabbitMQ";
 import {QueueName, QUEUES} from "./config/queues";
 import Payment from "./services/Payment";
+import {OfflineNotification} from "./jobs/OfflineNotification";
+import {Inbox} from "./jobs/Inbox";
 // import { Notification } from "./queues/NotificationQueue";
 // import { NewBooking } from "./queues/NewBooking";
 // import { UpdateRatingAgg } from "./queues/UpdateRatingAgg";
@@ -59,21 +61,19 @@ const PORT = env(EnvKey.PORT)!;
 
         for (const queueName of Object.keys(QUEUES) as QueueName[]) RabbitMQ.startConsumer(queueName, io); //! Add try catch
 
-        // const workerConfig: WorkerConfig = { connection: { url: env(EnvKey.REDIS_URL)! } };
+        const workerConfig: WorkerConfig = { connection: { url: env(EnvKey.REDIS_URL)! } };
 
-        // const IWorkers: IWorker<any>[] = [
-        //     new Notification(workerConfig, io),
-        //     new NewBooking(workerConfig, io),
-        //     new UpdateRatingAgg(workerConfig, io),
-        //     new NewView(workerConfig, io),
-        // ];
+        const IWorkers: IWorker<any>[] = [
+            new OfflineNotification(workerConfig, io),
+            new Inbox(workerConfig, io),
+        ];
 
-        // for (const IWorker of IWorkers) {
-        //     const worker = new Worker(IWorker.queueName, IWorker.process.bind(IWorker), IWorker.config);
-        //     if (IWorker.completed) worker.on('completed', IWorker.completed);
-        //     if (IWorker.failed) worker.on('failed', IWorker.failed);
-        //     if (IWorker.drained) worker.on('drained', IWorker.drained);
-        // }
+        for (const IWorker of IWorkers) {
+            const worker = new Worker(IWorker.queueName, IWorker.process.bind(IWorker), IWorker.config);
+            if (IWorker.completed) worker.on('completed', IWorker.completed);
+            if (IWorker.failed) worker.on('failed', IWorker.failed);
+            if (IWorker.drained) worker.on('drained', IWorker.drained);
+        }
 
         app.listen(PORT, () => console.log(`Server running on port - ${PORT}\n`));
     } catch (error) {

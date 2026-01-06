@@ -1,6 +1,6 @@
 import {Server, Socket} from "socket.io";
 import {Job} from "bullmq";
-import {QueueType} from "./constants";
+import {JobType, QueueType} from "./constants";
 
 export interface Cache { // TODO: use this only for users
     get: (key: string) => Promise<{ error: boolean; data?: any }>;
@@ -96,7 +96,7 @@ export interface IWorker<T> {
     failed?: (job: Job<any, void, string> | undefined, error: Error, prev: string) => void,
     drained?: () => void,
     config: WorkerConfig,
-    queueName: QueueType
+    queueName: JobType
 }
 
 export interface ISocket extends Socket {

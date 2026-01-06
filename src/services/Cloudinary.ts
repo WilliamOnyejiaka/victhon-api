@@ -23,6 +23,13 @@ export default class Cloudinary extends Service {
         });
     }
 
+    private resolveResourceType(mime: string): ResourceType {
+        if (mime.startsWith("image/")) return ResourceType.IMAGE;
+        if (mime.startsWith("video/")) return ResourceType.VIDEO;
+        if (mime.startsWith("audio/")) return ResourceType.VIDEO; // Cloudinary rule
+        return ResourceType.RAW;
+    }
+
     public async uploadV2(
         files: Express.Multer.File[],
         resourceType: ResourceType,
@@ -42,9 +49,10 @@ export default class Cloudinary extends Service {
 
                 while (attempt < MAX_RETRIES && !success) {
                     try {
+                        const resolvedType = this.resolveResourceType(file.mimetype);
 
                         const baseDetails = {
-                            resource_type: resourceType,
+                            resource_type: resolvedType,
                             folder: folder,
                             timeout: 100000,
                         };
@@ -52,15 +60,15 @@ export default class Cloudinary extends Service {
                         const result: any = await cloudinary.uploader.upload(file.path, baseDetails);
 
                         let thumbnail: null | string = null;
-                        const url = resourceType === ResourceType.IMAGE
+                        const url = resolvedType === ResourceType.IMAGE
                             ? this.getUrl(result.public_id)
                             : result.url;
 
-                        const duration = resourceType === ResourceType.VIDEO
+                        const duration = resolvedType === ResourceType.VIDEO
                             ? result.duration
                             : null;
 
-                        if (resourceType === ResourceType.VIDEO) {
+                        if (resolvedType === ResourceType.VIDEO) {
                             let thumbnailUrl = cloudinary.url(result.public_id, {
                                 resource_type: 'video',
                                 transformation: [

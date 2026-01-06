@@ -40,6 +40,7 @@ export enum ResourceType {
     IMAGE = "image",
     VIDEO = "video",
     AUDIO = "video",
+    RAW = "raw",
     PDF = "raw",
     AUTO = "auto"
 };
@@ -47,8 +48,8 @@ export enum ResourceType {
 export enum CdnFolders {
     PROFILEPICTURE = "victhon-cdn/profile-pictures/users",
     USERPICTURES = "victhon-cdn/profile-pictures/users/pictures",
-    SERVICES = "victhon-cdn/professionals/services"
-
+    SERVICES = "victhon-cdn/professionals/services",
+    CHAT = "victhon-cdn/chats/",
 }
 
 export enum AdminPermission {
@@ -220,7 +221,7 @@ export enum QueueType {
     NEW_BOOKING = 'new-booking-queue',
     NEW_VIEW = 'new-view-queue',
     UPDATE_RATING_AGG = 'update-rating-agg-queue',
-    NOTIFICATION_SCHEDULAR = 'notification-schedular-queue'
+    NOTIFICATION_SCHEDULAR = 'notification-schedular-queue',
 }
 
 export enum QueueNames {
@@ -228,6 +229,7 @@ export enum QueueNames {
     NOTIFICATION = "victhon_notification_queue",
     PAYMENT = "victhon_payment_queue",
     WALLET = "victhon_wallet_queue",
+    CHAT = "victhon_chat_queue",
 }
 
 export enum QueueEvents {
@@ -245,11 +247,16 @@ export enum QueueEvents {
     PAYMENT_REFUND_SUCCESSFUL = "payment.refund_successful",
     PAYMENT_REFUND_FAILED = "payment.refund_failed",
     WALLET_ESCROW_RELEASE = "wallet.escrow_release",
-};
+    CHAT_SEND_MESSAGE = "chat.send_message",
+    CHAT_MARK_AS_READ = "chat.mark_as_read",
+    CHAT_SEND_ATTACHMENT = "chat.send_attachment",
+    CHAT_DELETE_MESSAGES = "chat.delete_messages",
+}
 
 
 export enum JobType {
     OFFLINE_NOTIFICATION = 'offline-notification-queue',
+    INBOX = 'inbox-queue',
     NEW_BOOKING = 'new-booking-queue',
     NEW_VIEW = 'new-view-queue',
     UPDATE_RATING_AGG = 'update-rating-agg-queue',

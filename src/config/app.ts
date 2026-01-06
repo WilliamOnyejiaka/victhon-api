@@ -20,8 +20,7 @@ import service from "../routes/service";
 import review from "../routes/review";
 import payment from "../routes/payment";
 import wallet from "../routes/wallet";
-
-
+import chat from "../routes/chat";
 
 
 import verifyJWT from "../middlewares/verifyJWT";
@@ -46,7 +45,6 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
             }
         })
     );
-
 
 
     app.use(helmet());
@@ -83,9 +81,9 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     app.use("/api/v1/services", service);
     app.use("/api/v1/reviews", review);
     app.use("/api/v1/payments", payment);
-    app.use("/api/v1/professionals/wallets", verifyJWT([UserType.PROFESSIONAL]),wallet);
+    app.use("/api/v1/chats", chat);
 
-
+    app.use("/api/v1/professionals/wallets", verifyJWT([UserType.PROFESSIONAL]), wallet);
 
 
     app.post("/api/v1/test", async (req: Request, res: Response) => {

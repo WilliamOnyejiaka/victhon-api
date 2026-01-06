@@ -19,6 +19,7 @@ import {RatingAggregate} from "./RatingAggregate";
 import {Review} from "./Review";
 import {Transaction} from "./Transaction";
 import {Wallet} from "./Wallet";
+import ChatParticipant from "./ChatParticipant";
 
 // import { AuthProvider } from "./User";
 
@@ -128,6 +129,9 @@ export class Professional {
 
     @OneToMany(() => Transaction, (transaction) => transaction.professional)
     transactions: Transaction[];
+
+    @OneToMany(() => ChatParticipant, (chatParticipants) => chatParticipants.professional)
+    chatParticipants: ChatParticipant[];
 
     // @OneToMany(() => Favorite, v => v.professional, { cascade: true })
     // favorites: Favorite[];

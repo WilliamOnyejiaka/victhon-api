@@ -14,6 +14,7 @@ import {
 } from 'typeorm';
 import { Review } from "./Review";
 import {Transaction} from "./Transaction";
+import ChatParticipant from "./ChatParticipant";
 
 export interface PhotoField {
     url: string;
@@ -72,6 +73,9 @@ export class User {
 
     @OneToMany(() => Transaction, (transaction) => transaction.user)
     transactions: Transaction[];
+
+    @OneToMany(() => ChatParticipant, (chatParticipants) => chatParticipants.user)
+    chatParticipants: ChatParticipant[];
 
     @CreateDateColumn()
     createdAt: Date;
