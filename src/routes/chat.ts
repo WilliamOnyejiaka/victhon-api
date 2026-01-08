@@ -13,7 +13,7 @@ chat.post("/", createChat, asyncHandler(Controller.create));
 chat.get("/", verifyJWT([UserType.USER, UserType.PROFESSIONAL]), asyncHandler(Controller.getChats));
 chat.get("/:chatId", verifyJWT([UserType.USER, UserType.PROFESSIONAL]), asyncHandler(Controller.getChat));
 
-chat.post("/messages/attachments", sendMessageValidator, asyncHandler(Controller.sendAttachment));
+chat.post("/messages/attachments/:chatId", sendMessageValidator, asyncHandler(Controller.sendAttachment));
 chat.get("/messages/:chatId", getMessages, asyncHandler(Controller.getMessages));
 
 export default chat;

@@ -122,7 +122,7 @@ export class Professional {
 
     @OneToOne(() => Wallet, wallet => wallet.professional, {
         cascade: true,
-        eager: true,
+        eager: false,
     })
     wallet: Wallet;
 

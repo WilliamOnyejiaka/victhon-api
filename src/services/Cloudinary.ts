@@ -1,6 +1,6 @@
 import Service from "./Service";
 import {imageFolders, CdnFolders, ResourceType} from "../types/constants";
-import {UploadedFiles, FailedFiles} from "../types";
+import {UploadedFiles, FailedFiles, FileObject} from "../types";
 import compressImage from "../utils/compressImage";
 import cloudinary from "../config/cloudinary";
 import logger from "../config/logger";
@@ -31,7 +31,7 @@ export default class Cloudinary extends Service {
     }
 
     public async uploadV2(
-        files: Express.Multer.File[],
+        files: Express.Multer.File[] | FileObject[],
         resourceType: ResourceType,
         folder: CdnFolders
     ) {

@@ -247,8 +247,10 @@ export enum QueueEvents {
     PAYMENT_REFUND_SUCCESSFUL = "payment.refund_successful",
     PAYMENT_REFUND_FAILED = "payment.refund_failed",
     WALLET_ESCROW_RELEASE = "wallet.escrow_release",
-    CHAT_SEND_MESSAGE = "chat.send_message",
+    CHAT_RECEIVE_MESSAGE = "chat.receive_message",
     CHAT_MARK_AS_READ = "chat.mark_as_read",
+    CHAT_MARK_MESSAGES_AS_READ = "chat.mark_messages_as_read",
+    CHAT_RECEIVE_ATTACHMENT = "chat.receive_attachment",
     CHAT_SEND_ATTACHMENT = "chat.send_attachment",
     CHAT_DELETE_MESSAGES = "chat.delete_messages",
 }

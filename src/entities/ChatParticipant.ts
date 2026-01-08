@@ -24,6 +24,18 @@ export default class ChatParticipant {
     @ManyToOne(() => Professional, p => p.chatParticipants, { onDelete: "SET NULL" })
     professional: Professional;
 
+    @Column({ nullable: true })
+    professionalId?: string;
+
+    @Column({ nullable: true })
+    userId?: string;
+
+    @Column({ type: 'int', default: 0 })
+    unreadCount: number;
+
+    @Column({ type: 'timestamp', nullable: true })
+    lastReadAt?: Date;
+
     @CreateDateColumn()
     joinedAt: Date;
 }

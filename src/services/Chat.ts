@@ -5,8 +5,7 @@ import {Professional} from "../entities/Professional";
 import {User} from "../entities/User";
 import ChatParticipant from "../entities/ChatParticipant";
 import {CdnFolders, QueueEvents, QueueNames, ResourceType, UserType} from "../types/constants";
-import Message from "../entities/MessageEntity";
-import Handler from "../io/handlers/Handler";
+import Message, {MessageType} from "../entities/MessageEntity";
 import deleteFiles from "../utils/deleteFiles";
 import Cloudinary from "./Cloudinary";
 import {FailedFiles, UploadedFiles} from "../types";
@@ -30,8 +29,85 @@ export default class Chat extends Service {
     private readonly chatParticipantsRepo = AppDataSource.getRepository(ChatParticipant);
     private readonly messageAttachmentRepo = AppDataSource.getRepository(MessageAttachment);
 
+    private convertToFileObject(files: Express.Multer.File[]) {
+        return files.map((file: Express.Multer.File) => {
+            return {
+                mimetype: file.mimetype,
+                filename: file.filename,
+                path: file.path,
+                size: file.size,
+                originalname: file.originalname
+            }
+        })
+    }
 
-    public async sendAttachment(senderId: string, senderType: UserType, receiverId: string, receiverType: UserType, content: string | null, files: Express.Multer.File[]) {
+
+    public async sendAttachment(senderId: string, senderType: UserType, chatId: string, content: string | null, files: Express.Multer.File[]) {
+        try {
+
+            const chat = await this.repo.findOne({
+                where: {
+                    id: chatId,
+                },
+                relations: {
+                    participants: {
+                        user: true,
+                        professional: true
+                    }
+                }
+            });
+
+            if (!chat) return this.responseData(404, true, "Chat not found.");
+
+            const authorized = chat.participants.some((participant) => {
+                if (senderType === UserType.USER) {
+                    return participant.userId === senderId;
+                }
+
+                if (senderType === UserType.PROFESSIONAL) {
+                    return participant.professionalId === senderId;
+                }
+
+                return false;
+            });
+
+            if (!authorized) return this.responseData(401, true, "User is not authorized for this chat");
+
+            const receiver = chat.participants.find(p => {
+                if (senderType === UserType.USER) {
+                    return p.professionalId;
+                }
+                return p.userId;
+            });
+
+            if (!receiver) return this.responseData(404, true, "Receiver not found");
+
+            if (receiver) {
+                await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_SEND_ATTACHMENT, {
+                    eventType: QueueEvents.CHAT_SEND_ATTACHMENT,
+                    payload: {
+                        chatId,
+                        receiverId: receiver.userId ?? receiver.professionalId,
+                        receiverType: senderType == UserType.PROFESSIONAL ? UserType.USER : UserType.PROFESSIONAL,
+                        senderId,
+                        content,
+                        senderType,
+                        files: this.convertToFileObject(files)
+                    },
+                });
+            }
+
+            return this.responseData(201, false, "Attachments are been uploaded successfully", receiver);
+        } catch (error) {
+            if (files) {
+                await deleteFiles(files);
+            }
+            if (error instanceof TransactionError) return this.responseData(400, true, error.message);
+            return super.handleTypeormError(error);
+        }
+    }
+
+    public async sendAttachmenta(senderId: string, senderType: UserType, receiverId: string, receiverType: UserType, content: string | null, files: Express.Multer.File[]) {
         try {
             let where = {}
 
@@ -76,6 +152,7 @@ export default class Chat extends Service {
                 senderId,
                 senderType,
                 receiverType,
+                type: MessageType.FILE,
                 receiverId,
                 content,
                 attachments: images,
@@ -84,8 +161,8 @@ export default class Chat extends Service {
             const createdMessage = await this.messageRepo.save(newMessage);
 
             if (createdMessage) {
-                await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_SEND_ATTACHMENT, {
-                    eventType: QueueEvents.CHAT_SEND_ATTACHMENT,
+                await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_RECEIVE_ATTACHMENT, {
+                    eventType: QueueEvents.CHAT_RECEIVE_ATTACHMENT,
                     payload: {newMessage, receiverId, receiverType, senderId},
                 });
             }
@@ -108,21 +185,30 @@ export default class Chat extends Service {
                 const user = await manager.findOne(User, {where: {id: userId}});
                 if (!user) throw new TransactionError("User not found");
                 const chatExists = await manager.findOne(ChatParticipant, {
-                    where: {
-                        professional: {id: professional.id},
-                        user: {id: user.id}
-                    }
+                    where: [
+                        {
+                            professionalId: professional.id,
+                        },
+                        {
+                            userId: professional.id,
+                        },
+                    ],
                 });
                 if (chatExists) throw new TransactionError("Chat already exists");
 
                 const newChat = manager.create(ChatEntity, {});
                 const chat = await manager.save(newChat);
 
-                const participants = manager.create(ChatParticipant, {
-                    professional: {id: professional.id},
-                    user: {id: user.id},
-                    chat: {id: newChat.id}
-                });
+                const participants = manager.create(ChatParticipant, [
+                    {
+                        user: {id: user.id},
+                        chat: {id: newChat.id}
+                    },
+                    {
+                        professional: {id: professional.id},
+                        chat: {id: newChat.id}
+                    }
+                ]);
 
                 await manager.save(participants);
 
@@ -138,22 +224,35 @@ export default class Chat extends Service {
 
     public async getChat(userId: string, userType: UserType, chatId: string) {
         try {
-            const chat = await this.repo
-                .createQueryBuilder("chat")
-                .leftJoin("chat.participants", "participant")
-                .where("chat.id = :chatId", {chatId})
-                .andWhere(
-                    userType === UserType.PROFESSIONAL
-                        ? "participant.professionalId = :userId"
-                        : "participant.userId = :userId",
-                    {userId}
-                )
-                .getOne();
+            const chat = await this.repo.findOne({
+                where: {
+                    id: chatId,
+                },
+                relations: {
+                    participants: {
+                        user: true,
+                        professional: true
+                    }
+                }
+            });
 
             if (!chat) return this.responseData(404, true, "Chat not found.");
 
-            return this.responseData(200, false, "Chat has been retrieved successfully.", chat);
+            const authorized = chat.participants.some((participant) => {
+                if (userType === UserType.USER) {
+                    return participant.userId === userId;
+                }
 
+                if (userType === UserType.PROFESSIONAL) {
+                    return participant.professionalId === userId;
+                }
+
+                return false;
+            });
+
+            if (authorized) return this.responseData(200, false, "Chat has been retrieved successfully.", chat);
+
+            return this.responseData(401, true, "User is not authorized for this chat");
         } catch (error) {
             return super.handleTypeormError(error);
         }
@@ -191,6 +290,27 @@ export default class Chat extends Service {
             return this.handleTypeormError(error);
         }
     }
+
+    // public async getConversationsWithUnread(userId: string, userType: UserType) {
+    //     const repo = AppDataSource.getRepository(ChatParticipant);
+    //
+    //     const  = await repo.findAndCount({
+    //         where: userType === UserType.USER
+    //             ? { userId }
+    //             : { professionalId: userId },
+    //         relations: ['chat', 'chat.messages', 'chat.participants'],
+    //         order: { chat: { messages:{createdAt: 'DESC'} } }
+    //     });
+    //
+    //     return participants.map(p => ({
+    //         chatId: p.chat.id,
+    //         unreadCount: p.unreadCount,
+    //         lastMessageAt: p.chat.lastMessageAt,
+    //         // map other user/professional info
+    //         partner: getPartnerFromChat(p.chat, userId, userType),
+    //         lastMessage: p.chat.messages[p.chat.messages.length - 1],
+    //     }));
+    // }
 
     public async getMessages(userId: string, userType: UserType, chatId: string, page: number, limit: number) {
         try {

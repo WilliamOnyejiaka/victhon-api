@@ -17,17 +17,13 @@ export default class Chat {
     }
 
     public static async sendAttachment(req: Request, res: Response) {
-
-        // if(req.files && req.files?.length <= 0){
-        //
-        // }
-        const {senderId, senderType, receiverId, receiverType, content} = req.body;
+        const {senderId, senderType, content} = req.body;
+        const {chatId} = req.params;
 
         const serviceResult = await Chat.service.sendAttachment(
             senderId,
             senderType,
-            receiverId,
-            receiverType,
+            chatId!,
             content ?? null,
             req.files as Express.Multer.File[]);
 

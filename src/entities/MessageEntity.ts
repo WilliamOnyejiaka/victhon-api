@@ -15,7 +15,6 @@ import Inbox from "./InboxEntity";
 
 export enum MessageType {
     TEXT = "text",
-    IMAGE = "image",
     FILE = "file",
 }
 

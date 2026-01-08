@@ -1,22 +1,24 @@
 import {Server} from "socket.io";
 import {ISocket} from "../../types";
 import logger from "../../config/logger";
-import {Events, QueueEvents, QueueNames, UserType} from "../../types/constants";
+import {Namespaces, QueueEvents, QueueNames, UserType} from "../../types/constants";
 import Handler from "./Handler";
 import User from "../../services/User";
 import Professional from "../../services/Professional";
 import {AppDataSource} from "../../data-source";
 import ChatParticipant from "../../entities/ChatParticipant";
-import Message from "../../entities/MessageEntity";
+import Message, {MessageStatus} from "../../entities/MessageEntity";
 import {RabbitMQ} from "../../services/RabbitMQ";
 import OfflineNotification from "../../services/OfflineNotification";
 import Inbox from "../../services/Inbox";
+import {Not} from "typeorm";
+import ChatEntity from "../../entities/ChatEntity";
 
 
 interface SendMessagePayload {
     receiverId: string;
-    receiverType: UserType;
     content: string;
+    chatId: string;
 }
 
 
@@ -25,6 +27,7 @@ export default class SocketHandler {
     private static readonly userService = new User();
     private static readonly proService = new Professional();
     private static readonly chatParticipantsRepo = AppDataSource.getRepository(ChatParticipant);
+    private static readonly chatRepo = AppDataSource.getRepository(ChatEntity);
     private static readonly messageRepo = AppDataSource.getRepository(Message);
 
 
@@ -49,35 +52,87 @@ export default class SocketHandler {
         }
     }
 
-    public static async sendMessage(io: Server, socket: ISocket, data: SendMessagePayload) {
+    public static async enterChat(io: Server, socket: ISocket, data: any) {
         const socketId = socket.id;
+        const userId = socket.locals.data.id;
+        const userType = socket.locals.data.userType;
+        const {chatId} = data;
+
+        if (!chatId) {
+            return socket.emit(
+                "appError",
+                Handler.responseData(true, "Invalid payload")
+            );
+        }
+
+        const userService = userType == UserType.PROFESSIONAL ? SocketHandler.proService : SocketHandler.userService;
+
+        const added = await userService.userChats.add(userId, chatId);
+        if (!added) {
+            logger.info(`${userType}${userId} failed to enter chat:${chatId}`);
+
+            return socket.emit(
+                "appError",
+                Handler.responseData(true, "Something went wrong")
+            );
+        } else {
+            socket.emit("entered-chat", Handler.responseData(false, "Entered chat", {chatId}));
+            logger.info(`${userType}${userId} entered chat:${chatId}`);
+        }
+    }
+
+    public static async leaveChat(io: Server, socket: ISocket, data: any) {
+        const socketId = socket.id;
+        const userId = socket.locals.data.id;
+        const userType = socket.locals.data.userType;
+        const {chatId} = data;
+
+        if (!chatId) {
+            return socket.emit(
+                "appError",
+                Handler.responseData(true, "Invalid payload")
+            );
+        }
+
+        const userService = userType == UserType.PROFESSIONAL ? SocketHandler.proService : SocketHandler.userService;
+
+        const removed = await userService.userChats.remove(userId, chatId);
+        if (!removed) {
+            logger.info(`${userType}${userId} failed to leave chat:${chatId}`);
+
+            return socket.emit(
+                "appError",
+                Handler.responseData(true, "Something went wrong")
+            );
+        } else {
+            socket.emit("left-chat", Handler.responseData(false, "Left chat", {chatId}));
+            logger.info(`${userType}${userId} left chat:${chatId}`);
+        }
+    }
+
+
+    public static async sendMessage(io: Server, socket: ISocket, data: SendMessagePayload) {
         const senderId = socket.locals.data.id;
         const senderType = socket.locals.data.userType;
 
         logger.info(`📨 ${senderType}:${senderId} sending a message.`);
 
-        if (!data?.receiverId || !data?.receiverType || !data?.content?.trim()) {
+        if (!data?.receiverId || !data?.chatId || !data?.content?.trim()) {
             return socket.emit(
                 "appError",
                 Handler.responseData(true, "Invalid message payload")
             );
         }
 
-        if (!Object.values(UserType).includes(data.receiverType)) {
-            return socket.emit(
-                "appError",
-                Handler.responseData(true, "Invalid receiver type")
-            );
-        }
-
-
-        const {receiverId, receiverType, content} = data;
+        const {receiverId, content, chatId} = data;
 
         try {
             let where = {}
 
-            if (receiverType == UserType.PROFESSIONAL) where = {professional: {id: receiverId}, user: {id: senderId}};
-            if (receiverType == UserType.USER) where = {user: {id: receiverId}, professional: {id: senderId}};
+            const receiverType = senderType == UserType.PROFESSIONAL ? UserType.USER : UserType.PROFESSIONAL;
+
+            if (receiverType == UserType.PROFESSIONAL) where = {professional: {id: receiverId}, chat: {id: chatId}};
+            if (receiverType == UserType.USER) where = {chat: {id: chatId}, user: {id: receiverId}};
 
             const chatParticipant = await SocketHandler.chatParticipantsRepo.findOne({where, relations: ["chat"],});
 
@@ -101,8 +156,8 @@ export default class SocketHandler {
             logger.info(`📩 ${senderType}:${senderId} sent a message to ${receiverType}:${receiverId} successfully.`);
 
             if (created) {
-                await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_SEND_MESSAGE, {
-                    eventType: QueueEvents.CHAT_SEND_MESSAGE,
+                await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_RECEIVE_MESSAGE, {
+                    eventType: QueueEvents.CHAT_RECEIVE_MESSAGE,
                     payload: {newMessage, receiverId, receiverType, senderId},
                 });
             }
@@ -116,7 +171,117 @@ export default class SocketHandler {
         }
     }
 
+    public static async typing(io: Server, socket: ISocket, data: any) {
+        const userId = socket.locals.data.id;
+        const userType = socket.locals.data.userType;
+
+        const {chatId} = data;
+
+        try {
+            if (!chatId) {
+                socket.emit("appError", Handler.responseData(true, "Invalid payload"));
+                return;
+            }
+        } catch (error) {
+            console.error("typing error:", error);
+
+            socket.emit(
+                "appError",
+                Handler.responseData(true, "Failed to emit typing event")
+            );
+        }
+    }
+
     public static async markAsRead(io: Server, socket: ISocket, data: any) {
+        const userId = socket.locals.data.id;
+        const userType = socket.locals.data.userType;
+
+        const {chatId} = data;
+
+        try {
+            if (!chatId) {
+                socket.emit("appError", Handler.responseData(true, "Invalid payload"));
+                return;
+            }
+
+            const chat = await SocketHandler.chatRepo.findOne({
+                where: {
+                    id: chatId,
+                },
+                relations: ['participants']
+            });
+
+            if (!chat) {
+                logger.info(`👎 chat${chatId} does not exist`);
+                socket.emit("appError", Handler.responseData(true, "Chat not found"));
+                return;
+            }
+
+            const authorized = chat.participants.some((participant) => {
+                if (userType === UserType.USER) {
+                    return participant.userId === userId;
+                }
+
+                if (userType === UserType.PROFESSIONAL) {
+                    return participant.professionalId === userId;
+                }
+
+                return false;
+            });
+
+            if (!authorized) {
+                logger.info(`👎 ${userType}${userId} User is not authorized for chat:${chatId}`);
+                socket.emit("appError", Handler.responseData(true, "User is not authorized for this chat"));
+                return;
+            }
+
+
+            const updated = await SocketHandler.messageRepo.update({
+                chat: {id: chatId},
+                status: MessageStatus.DELIVERED,
+                receiverId: userId,
+                receiverType: userType
+            }, {
+                status: MessageStatus.READ
+            });
+
+            await AppDataSource.getRepository(ChatParticipant).update(
+                {
+                    chat: { id: chatId }, // assume all messages from same chat
+                    ...(userType === UserType.USER
+                        ? { userId }
+                        : { professionalId: userId }),
+                },
+                {
+                    unreadCount: 0,
+                    lastReadAt: new Date(),
+                }
+            );
+
+            socket.emit("read", Handler.responseData(false, "Messages read", {chat}));
+
+
+            if (updated.affected && updated.affected > 0) {
+                logger.info(`🆙 chat:${chatId} messages where updated`);
+
+                await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_MARK_AS_READ, {
+                    eventType: QueueEvents.CHAT_MARK_AS_READ,
+                    payload: {chat, userType},
+                });
+            } else {
+                logger.info(`👎 No messages for chat:${chatId} to update`);
+            }
+        } catch (error) {
+            console.error("markAsRead error:", error);
+
+            socket.emit(
+                "appError",
+                Handler.responseData(true, "Something went wrong")
+            );
+        }
+    }
+
+    public static async markMessagesAsRead(io: Server, socket: ISocket, data: any) {
         const socketId = socket.id;
         const userId = socket.locals.data.id;
         const userType = socket.locals.data.userType;
@@ -231,7 +396,12 @@ export default class SocketHandler {
             const userId = socket.locals.data.id;
             const userType = socket.locals.data.userType;
             const wasDeleted = userType == UserType.PROFESSIONAL ? await SocketHandler.proService.deleteSocketId(userId) : await SocketHandler.userService.deleteSocketId(userId);
-            if (!wasDeleted) socket.emit("appError", Handler.responseData(true, "An internal error occurred"));
+            if (!wasDeleted) logger.error(`❌ An internal error occurred, failed to remove ${userType}:${userId} from cache`)
+
+            const userService = userType == UserType.PROFESSIONAL ? SocketHandler.proService : SocketHandler.userService;
+            const deletedChats = userService.userChats.delete(userId);
+            if (!deletedChats) logger.error(`❌  An internal error occurred, failed to remove ${userType}:${userId} chats from cache`);
+
             logger.info(`👋 ${userType}:${userId} with the socket id - ${socket.id} has disconnected.`);
         } catch (error) {
             console.error("❌ Error in disconnect:", error);

@@ -4,17 +4,18 @@ import Service from "./Service";
 import {User as UserEntity} from "../entities/User";
 import UserCache from "../cache/UserCache";
 import UserSocket from "../cache/UserSocket";
-import {EditProfessionalDto, EditUserDto} from "../types";
+import {EditUserDto} from "../types";
 import emailValidator from "../validators/emailValidator";
 import Cloudinary from "./Cloudinary";
 import deleteFiles from "../utils/deleteFiles";
+import UserChats from "../cache/UserChats";
 
 
 export default class User extends Service {
     private readonly socketCache = new UserSocket();
     private readonly userCache: UserCache = new UserCache(UserType.USER);
     private readonly repo = AppDataSource.getRepository(UserEntity);
-
+    public readonly userChats = new UserChats(UserType.USER);
 
     public async setSocketId(userId: string, socketId: string) {
         return await this.socketCache.set(UserType.USER, userId, socketId);

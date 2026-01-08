@@ -8,11 +8,14 @@ import Cloudinary from "./Cloudinary";
 import deleteFiles from "../utils/deleteFiles";
 import UserSocket from "../cache/UserSocket";
 import UserCache from "../cache/UserCache";
+import UserChats from "../cache/UserChats";
 
 export default class Professional extends Service {
 
     private readonly socketCache = new UserSocket();
     private readonly userCache: UserCache = new UserCache(UserType.PROFESSIONAL);
+    public readonly userChats = new UserChats(UserType.PROFESSIONAL);
+
 
     public async setSocketId(userId: string, socketId: string) {
         return await this.socketCache.set(UserType.PROFESSIONAL, userId, socketId);

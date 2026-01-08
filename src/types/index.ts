@@ -102,3 +102,11 @@ export interface IWorker<T> {
 export interface ISocket extends Socket {
     locals?: any
 }
+
+export interface FileObject {
+    mimetype: string;
+    filename: string;
+    path: string;
+    size: number;
+    originalname: string;
+}

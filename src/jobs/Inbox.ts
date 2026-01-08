@@ -66,7 +66,7 @@ export class Inbox implements IWorker<any> {
                         : await userService.getSocketId(senderId);
 
                     if (socketId) {
-                        socketNamespace.to(socketId).emit("messages-read", {
+                        socketNamespace.to(socketId).emit("messages-delivered", {
                             readerId: data.userId,
                             messageIds, // only messages this sender sent
                         });
