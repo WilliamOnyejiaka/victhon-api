@@ -182,6 +182,67 @@ export default class SocketHandler {
                 socket.emit("appError", Handler.responseData(true, "Invalid payload"));
                 return;
             }
+
+            const chat = await SocketHandler.chatRepo.findOne({
+                where: {
+                    id: chatId,
+                },
+                relations: {
+                    participants: {
+                        user: true,
+                        professional: true
+                    }
+                }
+            });
+
+            if (!chat) {
+                socket.emit("appError", Handler.responseData(true, "Chat not found."));
+                return;
+            }
+
+            const authorized = chat.participants.some((participant) => {
+                if (userType === UserType.USER) {
+                    return participant.userId === userId;
+                }
+
+                if (userType === UserType.PROFESSIONAL) {
+                    return participant.professionalId === userId;
+                }
+
+                return false;
+            });
+
+            if (!authorized) {
+                socket.emit("appError", Handler.responseData(true, "User is not authorized for this chat"));
+                return;
+            }
+
+            const receiver = chat.participants.find(p => {
+                if (userType === UserType.USER) {
+                    return p.professionalId;
+                }
+                return p.userId;
+            });
+
+            if (!receiver) {
+                socket.emit("appError", Handler.responseData(true, "Receiver not found"));
+                return;
+            }
+
+            const receiverId = receiver.userId ?? receiver.professionalId;
+            const receiverType = userType == UserType.PROFESSIONAL ? UserType.USER : UserType.PROFESSIONAL
+
+            const socketNamespace = io.of(Namespaces.BASE);
+
+            const socketId = receiverType === UserType.PROFESSIONAL
+                ? await SocketHandler.proService.getSocketId(receiverId!)
+                : await SocketHandler.userService.getSocketId(receiverId!);
+
+            logger.info(`${userType}:${userId} is typing in chat:${chatId}`);
+
+            if (socketId) {
+                socketNamespace.to(socketId).emit("typing", {chatId});
+            }
         } catch (error) {
             console.error("typing error:", error);
 
@@ -247,10 +308,10 @@ export default class SocketHandler {
 
             await AppDataSource.getRepository(ChatParticipant).update(
                 {
-                    chat: { id: chatId }, // assume all messages from same chat
+                    chat: {id: chatId}, // assume all messages from same chat
                     ...(userType === UserType.USER
-                        ? { userId }
-                        : { professionalId: userId }),
+                        ? {userId}
+                        : {professionalId: userId}),
                 },
                 {
                     unreadCount: 0,

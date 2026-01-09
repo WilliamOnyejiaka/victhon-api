@@ -28,6 +28,9 @@ export class Account {
     @Column({ type: 'text' })
     bankName: string;
 
+    @Column({ type: 'text' })
+    bankCode: string;
+
     @Column()
     professionalId: string;
 

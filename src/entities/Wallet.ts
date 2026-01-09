@@ -30,7 +30,7 @@ export class Wallet {
     /**
      * Available balance (kobo)
      */
-    @Column("decimal", {precision: 12, scale: 2})
+    @Column("decimal", {precision: 24, scale: 2})
     balance: number;
 
     /**

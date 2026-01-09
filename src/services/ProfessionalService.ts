@@ -252,15 +252,15 @@ export default class ProfessionalService extends Service {
 
             // Dynamic filters: only add them if present
             if (name) {
-                query.orWhere("service.name LIKE :name", { name: `%${name}%` });
+                query.orWhere("service.name LIKE :name", {name: `%${name}%`});
             }
 
             if (category) {
-                query.orWhere("service.category LIKE :category", { category: `%${category}%` });
+                query.orWhere("service.category LIKE :category", {category: `%${category}%`});
             }
 
             if (description) {
-                query.orWhere("service.description LIKE :description", { description: `%${description}%` });
+                query.orWhere("service.description LIKE :description", {description: `%${description}%`});
             }
 
             // Price range filter
@@ -293,7 +293,7 @@ export default class ProfessionalService extends Service {
                 pagination: this.pagination(page, limit, total),
             }
             return this.responseData(200, false, "Services have been retrieved successfully", data)
-        }catch (error) {
+        } catch (error) {
             return this.handleTypeormError(error);
         }
     }
@@ -371,6 +371,14 @@ export default class ProfessionalService extends Service {
 
             let user = await professionalRepo.findOne({where: {id: userId}});
             if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
+
+            const professionalService = await this.repo.findOne({where: {id: id, professionalId: userId}});
+
+            if (!professionalService) return this.responseData(HttpStatus.NOT_FOUND, true, `Service was not found.`);
+
+            const publicIds = professionalService.images?.map((image) => image.publicId) ?? [];
+
+            if (publicIds.length > 0) await (new Cloudinary()).deleteFiles(publicIds);
 
             await this.repo.delete({professionalId: userId, id})
             return this.responseData(HttpStatus.OK, false, `Service was deleted successfully.`);

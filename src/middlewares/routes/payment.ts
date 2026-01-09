@@ -1,4 +1,4 @@
-import { param } from "express-validator";
+import {body, param} from "express-validator";
 import {handleValidationErrors} from "../validators";
 import {UserType} from "../../types/constants";
 import verifyJWT from "../verifyJWT";
@@ -8,5 +8,16 @@ export const initializeValidator = [
     param('bookingId')
         .exists().withMessage('Booking ID is required')
         .isUUID().withMessage('Booking ID must be a valid id'),
+    handleValidationErrors
+];
+
+export const withdrawValidator = [
+    verifyJWT([UserType.PROFESSIONAL]),
+    body('accountId')
+        .exists().withMessage('Account ID is required')
+        .isUUID().withMessage('Account ID must be a valid id'),
+    body('amount')
+        .exists().withMessage('Amount is required')
+        .isNumeric().withMessage('Amount must be a positive integer'),
     handleValidationErrors
 ];

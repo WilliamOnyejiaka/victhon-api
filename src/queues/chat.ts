@@ -255,7 +255,8 @@ chat.route(QueueEvents.CHAT_DELETE_MESSAGES, async (message: any, io: Server) =>
                 .getMany();
 
             const publicIds = attachments.map(attachment => attachment.publicId);
-            await cloudinary.deleteFiles(publicIds);
+            if (publicIds.length > 0) await cloudinary.deleteFiles(publicIds);
+
             await manager.delete(Message, {
                 id: In(chunk),
                 senderId: userId,

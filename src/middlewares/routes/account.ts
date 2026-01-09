@@ -20,5 +20,10 @@ export const accountValidator = [
         .trim()
         .isLength({ min: 2, max: 100 })
         .withMessage("Bank name must be between 2 and 100 characters"),
+
+    body("bankCode")
+        .isString()
+        .trim()
+        .withMessage("Bank code required"),
     handleValidationErrors
 ];

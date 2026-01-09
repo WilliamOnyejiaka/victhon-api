@@ -25,11 +25,24 @@ export default class Payment {
         Controller.response(res, serviceResult);
     }
 
-    public static  async verifyPaystackTransaction(req: Request, res: Response) {
+    public static async verifyPaystackTransaction(req: Request, res: Response) {
         const {id: userId} = res.locals.data;
         const {reference} = req.params;
-        const result = await Payment.service.verifyPaystackTransaction(reference!);
-        res.status(200).send(result);
+        const serviceResult = await Payment.service.verifyPaystackTransaction(reference!);
+        Controller.response(res, serviceResult);
+    }
+
+    public static async withdraw(req: Request, res: Response) {
+        const {id: userId} = res.locals.data;
+        const {accountId, amount} = req.body;
+        const parsedAmount = parseFloat(amount) || null;
+
+        if (!parsedAmount) {
+            res.status(400).send({error: true, message: 'Amount must be valid', data: {}});
+            return;
+        }
+        const serviceResult = await Payment.service.withdraw(userId, accountId, parsedAmount);
+        Controller.response(res, serviceResult);
     }
 
 

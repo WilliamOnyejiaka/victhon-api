@@ -14,6 +14,8 @@ import {In} from "typeorm";
 import notify from "./notify";
 import {NotificationType} from "../entities/Notification";
 import {Dispute} from "../entities/Dispute";
+import {Professional} from "../entities/Professional";
+import {Account} from "../entities/Account";
 
 export default class Payment extends BaseService {
 
@@ -22,6 +24,9 @@ export default class Payment extends BaseService {
     private readonly walletRepo = AppDataSource.getRepository(Wallet);
     private readonly escrowRepo = AppDataSource.getRepository(Escrow);
     private readonly disputeRepo = AppDataSource.getRepository(Dispute);
+    private readonly proRepo = AppDataSource.getRepository(Professional);
+    private readonly accountRepo = AppDataSource.getRepository(Account);
+
 
     private readonly PAYSTACK_SECRET_KEY = env(EnvKey.PAYSTACK_SECRET_KEY)!;
 
@@ -207,7 +212,6 @@ export default class Payment extends BaseService {
                     throw new Error(`Failed to verify transaction after ${MAX_RETRIES} attempts`);
                 }
 
-                // wait a bit before retrying
                 await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
             }
         }
@@ -718,8 +722,101 @@ export default class Payment extends BaseService {
         return this.responseData(200, false, null);
     }
 
+    public async withdraw(userId: string, accountId: string, amount: number) {
+        try {
+            // 1. Get user data (you'll implement this according to your DB)
+            // const user = await this.proRepo.findOne({where: {id: userId}, relations: ["account"]});
+            const account = await this.accountRepo.findOne({
+                where: {id: accountId, professionalId: userId},
+                relations: ["professional", "professional.wallet"]
+            });
 
-    public async withdraw(userId: string, amount: number) {
+            if (!account) return this.responseData(404, true, 'Account not found');
+
+            const professional = account.professional;
+            const wallet = account.professional.wallet;
+
+
+            if (wallet.balance < amount) return this.responseData(400, true, 'Insufficient balance');
+
+            if (amount < 10000) return this.responseData(400, true, 'Amount too low for withdrawal');
+
+            // 2. Create transfer recipient (if not already created & saved)
+            // let recipientCode = account.bankCode;
+            const axiosInstance = axios.create({
+                baseURL: 'https://api.paystack.co',
+                headers: {
+                    Authorization: `Bearer ${this.PAYSTACK_SECRET_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+
+            // if (!recipientCode) {
+
+            const recipientResponse = await axiosInstance.post('/transferrecipient', {
+                type: 'nuban',
+                name: `${professional.firstName} ${professional.lastName}`,
+                account_number: account.accountNumber,
+                bank_code: account.bankCode,
+                currency: 'NGN',
+                // description: `Withdrawal account for ${user.email}`,
+            });
+
+            const recipientData = recipientResponse.data.data;
+
+            console.log("recipientData: ", recipientData);
+
+            if (!recipientData?.recipient_code) return this.responseData(500, true, 'Failed to create transfer recipient');
+
+            const recipientCode = recipientData.recipient_code;
+
+            // Important: Save recipient code to user record!
+            // await this.saveRecipientCodeToUser(userId, recipientCode);
+            // }
+
+            // 3. Initiate the actual transfer
+            const transferResponse = await axiosInstance.post('/transfer', {
+                source: 'balance', // or 'subaccount' if you're using subaccounts
+                amount: Math.round(amount), // must be integer
+                recipient: recipientCode,
+                reason: `Withdrawal request - Service Provider ${userId}`,
+                reference: `wd_${userId}_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+            });
+
+            const transferData = transferResponse.data;
+
+            console.log("transferData: ", transferData);
+
+            if (!transferData.status) {
+                if (!recipientData?.recipient_code) return this.responseData(500, true, 'Transfer initiation failed');
+                // throw new Error(transferData.message || 'Transfer initiation failed');
+            }
+
+            // 4. You should:
+            //    - Save transfer reference to DB
+            //    - Decrease user balance (in transaction!)
+            //    - Create withdrawal record in your DB
+
+            // await this.recordWithdrawalTransaction({
+            //     userId,
+            //     amount,
+            //     reference: transferData.data.reference,
+            //     recipientCode,
+            //     status: transferData.data.status,
+            // });
+
+            return this.responseData(200, false, "Transaction was successful", transferData);
+
+        } catch (error: any) {
+            console.error('Withdrawal failed: ', error);
+
+            return this.handleTypeormError(error);
+        }
+    }
+
+
+    public async withdraws(userId: string, amount: number) {
         try {
             // const response = await axios.post(
             //     'https://api.paystack.co/transferrecipient',
@@ -736,7 +833,7 @@ export default class Payment extends BaseService {
             //     }
             // );
         } catch (error) {
-    
+
         }
     }
 

@@ -6,6 +6,8 @@ import { accountValidator } from '../middlewares/routes/account';
 const account = Router();
 
 account.post("/", accountValidator, asyncHandler(Controller.create));
+account.get("/banks", asyncHandler(Controller.banks));
+
 
 // professional.get("/views", asyncHandler(Controller.views));
 // professional.patch("/profile-photo", validatePhotoField, asyncHandler(Controller.uploadProfilePicture));
