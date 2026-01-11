@@ -73,15 +73,20 @@ export default class ProfessionalService extends Service {
 
     public async service(
         userId: string,
-        id: string
+        id: string,
+        includeProfile: boolean = true
     ) {
         try {
             const professionalRepo = AppDataSource.getRepository(Professional);
+            const relations = includeProfile ? ['professional'] : undefined;
 
             let user = await professionalRepo.findOne({where: {id: userId}});
             if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
 
-            const result = await this.repo.findOne({where: {id, professionalId: userId}});
+            const result = await this.repo.findOne({
+                where: {id, professionalId: userId},
+                relations: includeProfile ? ['professional'] : []
+            });
             if (!result) return this.responseData(HttpStatus.NOT_FOUND, true, "Service not found.");
 
             return this.responseData(HttpStatus.OK, false, `Service was retrieved successfully.`, result);

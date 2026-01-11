@@ -1,6 +1,7 @@
 import {Request, Response} from "express";
 import Controller from "./Controller";
 import Service from "../services/ProfessionalService";
+import {UserType} from "../types/constants";
 
 
 export default class Package {
@@ -22,8 +23,10 @@ export default class Package {
 
     public static async package(req: Request, res: Response) {
         const {id, professionalId} = req.params;
+        const {id: userId, userType} = res.locals.data;
+        const includeProfile = userType != UserType.PROFESSIONAL;
 
-        const serviceResult = await Package.service.service(professionalId!, id!);
+        const serviceResult = await Package.service.service(professionalId!, id!, includeProfile);
         Controller.response(res, serviceResult);
     }
 
