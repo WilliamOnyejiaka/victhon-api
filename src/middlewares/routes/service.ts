@@ -4,6 +4,12 @@ import {ResourceType, UserType} from "../../types/constants";
 import uploads from '../multer';
 import verifyJWT from '../verifyJWT';
 
+export const updateServiceImagesValidator = [
+    verifyJWT([UserType.PROFESSIONAL]),
+    uploads(ResourceType.IMAGE).array('images', 6),
+    handleValidationErrors
+];
+
 export const add = [
     verifyJWT([UserType.PROFESSIONAL]),
     uploads(ResourceType.IMAGE).array('images', 6),
@@ -80,14 +86,14 @@ export const validateServiceSearch = [
     // minPrice: optional decimal >= 0
     query("minPrice")
         .optional()
-        .isFloat({ min: 0 })
+        .isFloat({min: 0})
         .withMessage("minPrice must be a positive number")
         .toFloat(),
 
     // maxPrice: optional decimal >= 0
     query("maxPrice")
         .optional()
-        .isFloat({ min: 0 })
+        .isFloat({min: 0})
         .withMessage("maxPrice must be a positive number")
         .toFloat(),
 
@@ -121,14 +127,14 @@ export const validateServiceSearch = [
     // limit: optional integer >= 1, default 10
     query("limit")
         .optional()
-        .isInt({ min: 1 })
+        .isInt({min: 1})
         .withMessage("limit must be an integer greater than 0")
         .toInt(),
 
     // page: optional integer >= 1, default 1
     query("page")
         .optional()
-        .isInt({ min: 1 })
+        .isInt({min: 1})
         .withMessage("page must be an integer greater than 0")
         .toInt(),
     handleValidationErrors,

@@ -112,6 +112,18 @@ export default class Package {
         Controller.response(res, serviceResult);
     }
 
+    public static async updateServiceImages(req: Request, res: Response) {
+        const {id: professionalId} = res.locals.data;
+        const {id} = req.params;
+        const {publicIds} = req.body;
+        // const files = req.files as Express.Multer.File[];
+
+        const serviceResult = await Package.service.updateServiceImages(professionalId, id!, req.files as Express.Multer.File[], publicIds ?? []);
+
+        Controller.response(res, serviceResult);
+    }
+
+
     public static async delete(req: Request, res: Response) {
         const {id: professionalId} = res.locals.data;
         const {id} = req.params;

@@ -47,3 +47,14 @@ export const reviews = [
         .withMessage("Invalid professionalId format"),
     handleValidationErrors
 ];
+
+export const reviewValidator = [
+    verifyJWT([UserType.PROFESSIONAL, UserType.USER]),
+    param("professionalId")
+        .isUUID()
+        .withMessage("Invalid professionalId format"),
+    param("id")
+        .isUUID()
+        .withMessage("Invalid id format"),
+    handleValidationErrors
+];

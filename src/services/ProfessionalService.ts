@@ -1,11 +1,12 @@
 import {AppDataSource} from "../data-source";
-import {Professional} from "../entities/Professional";
+import {PhotoField, Professional} from "../entities/Professional";
 import {CdnFolders, HttpStatus, ResourceType} from "../types/constants";
 import Service from "./Service";
 import {ServiceEntity} from "../entities/ServiceEntity";
 import {DeepPartial} from "typeorm";
 import Cloudinary from "./Cloudinary";
 import {FailedFiles, UploadedFiles} from "../types";
+import deleteFiles from "../utils/deleteFiles";
 
 interface ServiceSearchOptions {
     name?: string | undefined;
@@ -67,6 +68,9 @@ export default class ProfessionalService extends Service {
             const data = await this.repo.save(newService);
             return this.responseData(201, false, "Service has been created successfully", data)
         } catch (error) {
+            if (payload.files.length > 0) {
+                await deleteFiles(payload.files);
+            }
             return this.handleTypeormError(error);
         }
     }
@@ -332,6 +336,151 @@ export default class ProfessionalService extends Service {
             .map((result) => result.publicId);
 
         return {success, failed};
+    }
+
+    public async updateServiceImages(
+        professionalId: string,
+        serviceId: string,
+        files: Express.Multer.File[],
+        removePublicIds: string[]
+    ) {
+        // if (!files || files.length === 0) return this.responseData(400, true, "No files provided");
+        let uploadedFiles: UploadedFiles[] = [];
+        const cloudinary = new Cloudinary();
+
+        try {
+            const professionalService = await this.repo.findOne({
+                where: {id: serviceId, professionalId}
+            });
+
+            if (!professionalService) return this.responseData(404, true, "Service not found");
+
+
+            const existingImages = professionalService.images ?? [];
+
+            const imagesToKeep = existingImages.filter(
+                img => !removePublicIds.includes(img.publicId)
+            );
+
+            const finalImageCount = imagesToKeep.length + files.length;
+
+            if (finalImageCount > 6)
+                return this.responseData(
+                    400,
+                    true,
+                    `You can only have a maximum of 6 images`
+                );
+            if (removePublicIds.length > 0) {
+                await cloudinary.deleteFiles(removePublicIds);
+            }
+
+            const uploadResult = await cloudinary.uploadV2(
+                files,
+                ResourceType.IMAGE,
+                CdnFolders.SERVICES
+            );
+            //
+            // if (uploadResult.failedFiles?.length > 0) {
+            //     return this.responseData(
+            //         500,
+            //         true,
+            //         "Some files failed to upload",
+            //         uploadResult.failedFiles
+            //     );
+            // }
+
+            uploadedFiles = uploadResult.uploadedFiles;
+
+            const newImages = uploadedFiles.map(file => ({
+                url: file.url,
+                publicId: file.publicId
+            }));
+
+            professionalService.images = [...imagesToKeep, ...newImages];
+
+            await this.repo.save(professionalService);
+
+            return this.responseData(
+                200,
+                false,
+                "Service Images updated successfully",
+                professionalService
+            );
+
+        } catch (error) {
+            // rollback uploaded cloudinary images
+            if (uploadedFiles.length > 0) {
+                await cloudinary.deleteFiles(
+                    uploadedFiles.map(f => f.publicId)
+                );
+            }
+
+            await deleteFiles(files);
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async updateServiceImagess(professionalId: string, serviceId: string, files: Express.Multer.File[], imagesPublicId: string[]) {
+        try {
+            if (files.length < 1) return this.responseData(400, false, "No files found.");
+
+            const professionalService = await this.repo.findOne({where: {id: serviceId, professionalId}});
+            if (!professionalService) return this.responseData(404, true, "Service not found.");
+
+            const cloudinary = new Cloudinary();
+
+            const imagesLength = ((professionalService.images?.length ?? 0) + files.length) - imagesPublicId.length;
+
+            if (imagesLength > 6) return this.responseData(400, true, "Invalid");
+
+            let toKeepPublicImages: PhotoField[] = [];
+
+            if (imagesPublicId.length > 0) {
+                const toDeletePublicIds = professionalService.images?.map(image => {
+                    if (imagesPublicId.includes(image.publicId)) {
+                        return image.publicId;
+                    } else {
+                        toKeepPublicImages.push(image);
+                    }
+                }) ?? [];
+
+                if (toDeletePublicIds?.length > 0) await cloudinary.deleteFiles(imagesPublicId);
+            }
+
+            let images: { url: string, publicId: string }[] = [];
+
+            if (files) {
+                const cloudinary = new Cloudinary();
+
+                let uploadedFiles: UploadedFiles[] = [], publicIds: string[] = [], failedFiles: FailedFiles[] = [];
+                ({
+                    uploadedFiles,
+                    failedFiles,
+                    publicIds: imagesPublicId
+                } = await cloudinary.uploadV2(files, ResourceType.IMAGE, CdnFolders.SERVICES));
+                if (failedFiles?.length > 0) return this.responseData(500, true, "File uploads failed", failedFiles);
+
+                images = uploadedFiles.map((upload) => ({url: upload.url, publicId: upload.publicId}));
+            }
+
+            if (images?.length > 0) {
+                professionalService.images = [
+                    ...toKeepPublicImages,
+                    ...images,
+                ];
+
+                await this.repo.save(professionalService);
+
+                return this.responseData(200, false, "Images have been updated successfully.");
+            }
+            return this.responseData(500, true, "Something went wrong.");
+
+        } catch (error) {
+            if (files.length > 0) {
+                await deleteFiles(files);
+            }
+            return this.handleTypeormError(error);
+        }
     }
 
 

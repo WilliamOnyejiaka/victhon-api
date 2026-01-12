@@ -7,6 +7,7 @@ import {
     deleteValidator,
     packagesValidator,
     packageValidator,
+    updateServiceImagesValidator,
     updateServiceValidator,
     validateServiceSearch
 } from '../middlewares/routes/service';
@@ -20,6 +21,7 @@ packageRoute.get("/nearBy", allServices, asyncHandler(Controller.nearByProfessio
 packageRoute.get("/:professionalId", packagesValidator, asyncHandler(Controller.packages));
 packageRoute.get("/:professionalId/:id", packageValidator, asyncHandler(Controller.package));
 packageRoute.put("/:id", updateServiceValidator, asyncHandler(Controller.update));
+packageRoute.patch("/images/:id", updateServiceImagesValidator, asyncHandler(Controller.updateServiceImages));
 packageRoute.delete("/:id", deleteValidator, asyncHandler(Controller.delete));
 
 export default packageRoute;

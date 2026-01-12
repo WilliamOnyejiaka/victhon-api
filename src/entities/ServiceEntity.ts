@@ -33,7 +33,7 @@ export class ServiceEntity {
     @Column({ type: 'varchar', length: 80 })
     category: string;
 
-    @Column({ type: 'varchar', length: 80 })
+    @Column({ type: 'text' , nullable: true})
     description: string;
 
     @Column({ type: 'decimal', precision: 10, scale: 2 })

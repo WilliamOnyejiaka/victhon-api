@@ -258,7 +258,56 @@ export default class Chat extends Service {
         }
     }
 
-    public async getChats(userId: string, userType: UserType, page: number, limit: number) {
+    public async getChats(
+        userId: string,
+        userType: UserType,
+        page: number,
+        limit: number
+    ) {
+        try {
+            const skip = (page - 1) * limit;
+
+            const qb = this.repo
+                .createQueryBuilder("chat")
+
+                // ✅ Join ALL participants (for response)
+                .leftJoinAndSelect("chat.participants", "participants")
+
+                // ✅ Join ONLY for filtering
+                .innerJoin(
+                    "chat.participants",
+                    "filterParticipant",
+                    userType === UserType.PROFESSIONAL
+                        ? "filterParticipant.professionalId = :userId"
+                        : "filterParticipant.userId = :userId",
+                    { userId }
+                )
+
+                // ✅ Latest message ordering (safe subquery)
+                .addSelect(subQuery => {
+                    return subQuery
+                        .select("MAX(message.createdAt)")
+                        .from("messages", "message")
+                        .where("message.chatId = chat.id");
+                }, "latestMessageAt")
+
+                .orderBy("latestMessageAt", "DESC")
+                .skip(skip)
+                .take(limit);
+
+            const [records, total] = await qb.getManyAndCount();
+
+            return this.responseData(200, false, "Chats retrieved successfully", {
+                records,
+                pagination: this.pagination(page, limit, total),
+            });
+
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async getChatss(userId: string, userType: UserType, page: number, limit: number) {
         try {
             const skip = (page - 1) * limit;
 

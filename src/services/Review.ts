@@ -1,9 +1,9 @@
-import { AppDataSource } from "../data-source";
+import {AppDataSource} from "../data-source";
 import Service from "./Service";
-import { Review as Entity } from "../entities/Review";
-import { Professional } from "../entities/Professional";
-import { RatingAggregate } from "../entities/RatingAggregate";
-import { Queues } from "../config/bullMQ";
+import {Review as Entity} from "../entities/Review";
+import {Professional} from "../entities/Professional";
+import {RatingAggregate} from "../entities/RatingAggregate";
+import {Queues} from "../config/bullMQ";
 
 
 export default class Review extends Service {
@@ -20,7 +20,7 @@ export default class Review extends Service {
         try {
             const data = await AppDataSource.transaction(async (manager) => {
                 const existingProfessional = await manager.findOne(Professional, {
-                    where: { id: professionalId },
+                    where: {id: professionalId},
                 });
 
                 if (!existingProfessional) {
@@ -29,7 +29,7 @@ export default class Review extends Service {
 
                 // 2. Prevent duplicate reviews (VERY IMPORTANT)
                 const existingReview = await manager.findOne(Entity, {
-                    where: { userId, professionalId },
+                    where: {userId, professionalId},
                 });
 
                 if (existingReview) {
@@ -45,7 +45,7 @@ export default class Review extends Service {
 
                 let agg = await manager.createQueryBuilder(RatingAggregate, "agg")
                     .setLock("pessimistic_write")
-                    .where("agg.professionalId = :professionalId", { professionalId })
+                    .where("agg.professionalId = :professionalId", {professionalId})
                     .getOne();
 
                 if (!agg) {
@@ -90,19 +90,32 @@ export default class Review extends Service {
         }
     }
 
+    public async review(professionalId: string, id: string) {
+        try {
+
+            const review = await this.repo.findOne({where: {id, professionalId}});
+
+            if (!review) return this.responseData(404, true, "Review not found");
+
+            return this.responseData(200, false, "Review has been retrieved successfully", review);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
     public async reviews(professionalId: string, page: number, limit: number) {
         try {
             const skip = (page - 1) * limit;
 
             const [[reviews, total], details] = await Promise.all([
                 this.repo.findAndCount({
-                    where: { professionalId: professionalId },
+                    where: {professionalId: professionalId},
                     skip,
                     take: limit,
-                    order: { createdAt: "DESC" },
+                    order: {createdAt: "DESC"},
                     relations: ["user"],
                 }),
-                this.ratingAggRepo.findOne({ where: { professionalId: professionalId } })
+                this.ratingAggRepo.findOne({where: {professionalId: professionalId}})
             ]);
 
             const data = {
