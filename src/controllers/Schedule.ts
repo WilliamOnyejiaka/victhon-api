@@ -7,6 +7,13 @@ export default class Schedule {
 
     private static service = new Service();
 
+    public static async createSchedules(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+
+        const serviceResult = await Schedule.service.createSchedules(userId, req.body);
+        Controller.response(res, serviceResult);
+    }
+
     public static async createSchedule(req: Request, res: Response) {
         const { id: userId } = res.locals.data;
         const { dayOfWeek, startTime, endTime, isActive, validFrom, validUntil } = req.body;

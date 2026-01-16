@@ -6,7 +6,8 @@ import {
     deleteValidator,
     schedulesValidator,
     scheduleValidator,
-    updateScheduleValidator
+    updateScheduleValidator,
+    validateCreateSchedules
 } from '../middlewares/routes/schedule';
 
 const schedule = Router();
@@ -17,7 +18,7 @@ schedule.put("/:id", updateScheduleValidator, asyncHandler(Controller.update));
 schedule.delete("/:id", deleteValidator, asyncHandler(Controller.delete));
 
 
-
+schedule.post("/add-many", validateCreateSchedules, asyncHandler(Controller.createSchedules));
 schedule.post("/", createScheduleValidator, asyncHandler(Controller.createSchedule));
 
 export default schedule;

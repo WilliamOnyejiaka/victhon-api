@@ -72,6 +72,83 @@ export const createScheduleValidator = [
     handleValidationErrors
 ];
 
+export const validateCreateSchedules = [
+    verifyJWT([UserType.PROFESSIONAL]),
+    body().isArray({ min: 1, max: 10 }).withMessage('Body must be a non-empty array of schedules and must be less than 11'),
+    body('*.dayOfWeek')
+        .isIn([
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ])
+        .withMessage("dayOfWeek must be a valid weekday"),
+
+    body('*.startTime')
+        .matches(/^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$/)
+        .withMessage("startTime must be in HH:MM:SS format"),
+
+    body("*.endTime")
+        .matches(/^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$/)
+        .withMessage("endTime must be in HH:MM:SS format"),
+
+    body("*.isActive")
+        .isBoolean()
+        .withMessage("isActive must be a boolean")
+        .toBoolean(),
+        
+    // Optional date range
+    body("*.validFrom")
+        .optional()
+        .isISO8601()
+        .withMessage("validFrom must be a valid date (YYYY-MM-DD)"),
+
+    body("*.validUntil")
+        .optional()
+        .isISO8601()
+        .withMessage("validUntil must be a valid date (YYYY-MM-DD)"),
+
+    // Custom cross-field validation: endTime > startTime
+    body('*.endTime').custom((endTime, { req, path }) => {
+        // path looks like: "0.endTime", "1.endTime", etc.
+        const index = path.split('.')[0]!;
+        const item = req.body[index];
+
+        if (!item) return true;
+
+        const { startTime } = item;
+
+        if (!startTime || !endTime) return true;
+
+        if (startTime >= endTime) {
+            throw new Error('endTime must be later than startTime');
+        }
+
+        return true;
+    }),
+
+    body('*.validUntil').custom((validUntil, { req, path }) => {
+        const index = path.split('.')[0]!;
+        const item = req.body[index];
+
+        if (!item) return true;
+
+        const { validFrom } = item;
+
+        // Both present → check order
+        if (validFrom && validUntil && validFrom >= validUntil) {
+            throw new Error('validUntil must be after validFrom');
+        }
+
+        return true;
+    }),
+
+    handleValidationErrors
+];
+
 export const scheduleValidator = [
     param("professionalId")
         .isUUID()

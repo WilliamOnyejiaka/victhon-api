@@ -9,6 +9,31 @@ export default class Schedule extends Service {
 
     private readonly repo = AppDataSource.getRepository(ProfessionalSchedule);
 
+    public async createSchedules(
+        userId: string,
+        schedules: any
+    ) {
+        try {
+            const professionalRepo = AppDataSource.getRepository(ProfessionalEntity);
+
+            let user = await professionalRepo.findOne({ where: { id: userId } });
+            if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
+
+            const newSchedules = schedules.map((schedule: any) =>
+                this.repo.create({
+                    ...schedule,
+                    professional: {id: userId}
+                })
+            );
+            const savedSchedules = await this.repo.save(newSchedules);
+
+            return this.responseData(HttpStatus.OK, false, `Professional schedules were created successfully.`, savedSchedules);
+
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
 
     public async createSchedule(
         userId: string,
@@ -38,7 +63,7 @@ export default class Schedule extends Service {
             } as DeepPartial<ProfessionalSchedule>);
 
             await scheduleRepo.save(schedule);
-            return this.responseData(HttpStatus.OK, false, `Professional was retrieved successfully.`, schedule);
+            return this.responseData(HttpStatus.OK, false, `Professional schedule was created successfully.`, schedule);
 
         } catch (error) {
             return this.handleTypeormError(error);
