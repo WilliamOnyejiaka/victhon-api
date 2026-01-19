@@ -273,6 +273,11 @@ export default class Chat extends Service {
                 // ✅ Join ALL participants (for response)
                 .leftJoinAndSelect("chat.participants", "participants")
 
+                // ✅ Join profiles conditionally
+                .leftJoinAndSelect("participants.user", "user")
+                .leftJoinAndSelect("participants.professional", "professional")
+
+
                 // ✅ Join ONLY for filtering
                 .innerJoin(
                     "chat.participants",
