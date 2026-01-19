@@ -58,3 +58,39 @@ export const reviewValidator = [
         .withMessage("Invalid id format"),
     handleValidationErrors
 ];
+
+export const deleteValidator = [
+    verifyJWT([UserType.USER]),
+    param("reviewId")
+        .isUUID()
+        .withMessage("Invalid reviewId format"),
+    handleValidationErrors
+];
+
+export const updateValidator = [
+    verifyJWT([UserType.USER]),
+    body("text")
+        .isString().withMessage("Text must be a string")
+        .notEmpty().withMessage("Text is required"),
+
+    body("rating")
+        .isInt({ min: 1, max: 5 })
+        .withMessage("Rating must be an integer between 1 and 5"),
+
+    body().custom(async (value) => {
+        const { userId, professionalId } = value;
+        if (!userId || !professionalId) return true;
+
+        const reviewRepo = AppDataSource.getRepository(Review);
+        const existing = await reviewRepo.findOne({
+            where: { userId, professionalId },
+        });
+
+        if (existing) {
+            throw new Error("You have already reviewed this professional");
+        }
+
+        return true;
+    }),
+    handleValidationErrors
+];

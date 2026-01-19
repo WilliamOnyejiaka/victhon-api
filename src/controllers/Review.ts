@@ -1,4 +1,4 @@
-import {Request, Response} from "express";
+import { Request, Response } from "express";
 import Controller from "./Controller";
 import Service from "../services/Review";
 
@@ -7,8 +7,8 @@ export default class Review {
     private static service = new Service();
 
     public static async create(req: Request, res: Response) {
-        const {id: userId} = res.locals.data;
-        const {rating, text, professionalId} = req.body;
+        const { id: userId } = res.locals.data;
+        const { rating, text, professionalId } = req.body;
 
         const serviceResult = await Review.service.createReview(userId, professionalId, parseInt(rating), text);
 
@@ -16,8 +16,8 @@ export default class Review {
     }
 
     public static async review(req: Request, res: Response) {
-        const {id: userId} = res.locals.data;
-        const {professionalId, id} = req.params;
+        const { id: userId } = res.locals.data;
+        const { professionalId, id } = req.params;
 
         const serviceResult = await Review.service.review(professionalId!, id!);
 
@@ -25,9 +25,9 @@ export default class Review {
     }
 
     public static async reviews(req: Request, res: Response) {
-        const {id: userId} = res.locals.data;
-        let {page, limit} = req.query;
-        const {professionalId} = req.params;
+        const { id: userId } = res.locals.data;
+        let { page, limit } = req.query;
+        const { professionalId } = req.params;
 
         const parsedPage = parseInt(page as string) || 1;
         const parsedLimit = parseInt(limit as string) || 10;
@@ -37,4 +37,28 @@ export default class Review {
 
         Controller.response(res, serviceResult);
     }
+
+    public static async update(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const { reviewId } = req.params;
+        const { rating, text } = req.body;
+
+        const serviceResult = await Review.service.updateReview(
+            userId,
+            reviewId!,
+            { rating, text }
+        );
+
+        Controller.response(res, serviceResult);
+    }
+
+    public static async delete(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const { reviewId } = req.params;
+
+        const serviceResult = await Review.service.delete(userId, reviewId!);
+
+        Controller.response(res, serviceResult);
+    }
+
 }

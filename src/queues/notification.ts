@@ -85,30 +85,5 @@ notification.route(QueueEvents.NOTIFICATION_OFFLINE, async (message: any, io: Se
     }
 });
 
-// notification.route(QueueEvents.MASS_EMAIL, async (message: any, io: Server) => {
-//     const { payload: { emails, subject, html } } = message;
-//
-//     try {
-//         const email = new Email();
-//         await email.sendMassEmail(emails, subject, html);
-//         logger.info(`📧 Mass sending emails`)
-//     } catch (error) {
-//         service.handleMongoError(error);
-//     }
-// });
-//
-// notification.route(QueueEvents.SIGN_UP_EMAIL, async (message: any, io: Server) => {
-//     const { payload: { to, name } } = message;
-//
-//     try {
-//         const email = new Email();
-//         const html = await email.getEmailTemplate({ name }, path.join(__dirname, './../views', "welcome.ejs")) as string;
-//         await email.sendEmail(to, "Welcome to boomger", html);
-//         logger.info(`📧 Sending welcome email to ${to}`)
-//     } catch (error) {
-//         service.handleMongoError(error);
-//     }
-// });
-
 
 export default notification;
