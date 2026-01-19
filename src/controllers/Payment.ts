@@ -28,7 +28,7 @@ export default class Payment {
     public static async verifyPaystackTransaction(req: Request, res: Response) {
         const {id: userId} = res.locals.data;
         const {reference} = req.params;
-        const serviceResult = await Payment.service.verifyPaystackTransaction(reference!);
+        const serviceResult = await Payment.service.verifyPaystackTransactionService(reference!);
         Controller.response(res, serviceResult);
     }
 

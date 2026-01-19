@@ -1,21 +1,21 @@
 import axios from 'axios'
 import crypto from 'crypto';
 import BaseService from './Service';
-import {Booking, BookingStatus} from "../entities/Booking";
-import {AppDataSource} from "../data-source";
-import env, {EnvKey} from "../config/env";
-import {Escrow, EscrowStatus, RefundStatus} from "../entities/Escrow";
-import {Transaction, TransactionStatus, TransactionType} from "../entities/Transaction";
+import { Booking, BookingStatus } from "../entities/Booking";
+import { AppDataSource } from "../data-source";
+import env, { EnvKey } from "../config/env";
+import { Escrow, EscrowStatus, RefundStatus } from "../entities/Escrow";
+import { Transaction, TransactionStatus, TransactionType } from "../entities/Transaction";
 import logger from "../config/logger";
-import {Wallet} from "../entities/Wallet";
-import {QueueEvents, QueueNames, UserType} from "../types/constants";
-import {RabbitMQ} from "./RabbitMQ";
-import {In} from "typeorm";
+import { Wallet } from "../entities/Wallet";
+import { QueueEvents, QueueNames, UserType } from "../types/constants";
+import { RabbitMQ } from "./RabbitMQ";
+import { In } from "typeorm";
 import notify from "./notify";
-import {NotificationType} from "../entities/Notification";
-import {Dispute} from "../entities/Dispute";
-import {Professional} from "../entities/Professional";
-import {Account} from "../entities/Account";
+import { NotificationType } from "../entities/Notification";
+import { Dispute } from "../entities/Dispute";
+import { Professional } from "../entities/Professional";
+import { Account } from "../entities/Account";
 
 export default class Payment extends BaseService {
 
@@ -33,7 +33,7 @@ export default class Payment extends BaseService {
     public async initializeBookingPayment(bookingId: string, userId: string) {
         try {
             const booking = await this.bookingRepo.findOne({
-                where: {id: bookingId, userId: userId},
+                where: { id: bookingId, userId: userId },
                 relations: ["escrow", "user", "professional.wallet"]
             });
 
@@ -96,7 +96,7 @@ export default class Payment extends BaseService {
                 }
             );
             if (response.status === 200 && response.data.status) {
-                const {access_code, reference} = response.data.data;
+                const { access_code, reference } = response.data.data;
 
                 transaction.accessCode = access_code;
                 transaction.reference = reference;
@@ -133,8 +133,8 @@ export default class Payment extends BaseService {
                  */
                 const txs = await manager
                     .createQueryBuilder(Transaction, "tx")
-                    .where("tx.status = :status", {status: TransactionStatus.PENDING})
-                    .andWhere("tx.createdAt < :threshold", {threshold})
+                    .where("tx.status = :status", { status: TransactionStatus.PENDING })
+                    .andWhere("tx.createdAt < :threshold", { threshold })
                     .orderBy("tx.createdAt", "ASC")
                     .limit(BATCH_SIZE)
                     .setLock("pessimistic_write")
@@ -145,7 +145,7 @@ export default class Payment extends BaseService {
                 await manager
                     .createQueryBuilder()
                     .update(Transaction)
-                    .set({status: TransactionStatus.PROCESSING})
+                    .set({ status: TransactionStatus.PROCESSING })
                     .whereInIds(txs.map(t => t.id))
                     .execute();
 
@@ -173,7 +173,7 @@ export default class Payment extends BaseService {
                     if (paystackTx.status === "success") {
                         await RabbitMQ.publishToExchange(QueueNames.PAYMENT, QueueEvents.PAYMENT_CHARGE_SUCCESSFUL, {
                             eventType: QueueEvents.PAYMENT_CHARGE_SUCCESSFUL,
-                            payload: {data: paystackTx},
+                            payload: { data: paystackTx },
                         });
                     } else if (paystackTx.status === "failed") {
                         await this.failTransaction(tx.id, "Paystack failed");
@@ -215,6 +215,41 @@ export default class Payment extends BaseService {
                 await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
             }
         }
+
+        // Fallback, should never reach here
+        return {
+            status: "error",
+            error: "Unexpected error in verifyPaystackTransaction",
+        };
+    }
+
+    public async verifyPaystackTransactionService(reference: string) {
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY_MS = 1000; // 1 second between retries
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                const response = await axios.get(
+                    `https://api.paystack.co/transaction/verify/${reference}`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${this.PAYSTACK_SECRET_KEY}`,
+                        },
+                    }
+                );
+                return this.responseData(200, false, "Successful verification", response.data); // success, return immediately
+            } catch (error) {
+                console.error(`Attempt ${attempt} failed:`, error);
+
+                if (attempt === MAX_RETRIES) {
+                    throw new Error(`Failed to verify transaction after ${MAX_RETRIES} attempts`);
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+            }
+        }
+
+        return this.responseData(200, false, "Unexpected error in verifyPaystackTransaction");
     }
 
     public async failTransaction(
@@ -222,8 +257,8 @@ export default class Payment extends BaseService {
         reason: string
     ) {
         await AppDataSource.getRepository(Transaction).update(
-            {id: txId},
-            {status: TransactionStatus.FAILED}
+            { id: txId },
+            { status: TransactionStatus.FAILED }
         );
     }
 
@@ -231,15 +266,15 @@ export default class Payment extends BaseService {
         txId: string
     ) {
         await AppDataSource.getRepository(Transaction).update(
-            {id: txId},
-            {status: TransactionStatus.PENDING}
+            { id: txId },
+            { status: TransactionStatus.PENDING }
         );
     }
 
 
     public async successfulCharge(eventData: any) {
         try {
-            const {transactionId} = eventData.metadata;
+            const { transactionId } = eventData.metadata;
 
             if (!transactionId) {
                 logger.error("No transactionId in webhook metadata");
@@ -251,9 +286,9 @@ export default class Payment extends BaseService {
             await AppDataSource.transaction(async (manager) => {
                 // Fetch transaction with relations using the transactional manager
                 const payment = await manager.findOne(Transaction, {
-                    where: {id: transactionId},
+                    where: { id: transactionId },
                     relations: ["escrow", "escrow.booking", "escrow.booking.professional", "escrow.booking.professional.wallet"],
-                    lock: {mode: "pessimistic_write"}
+                    lock: { mode: "pessimistic_write" }
                 });
 
                 if (!payment) {
@@ -270,8 +305,8 @@ export default class Payment extends BaseService {
                 // Update transaction status
                 await manager.update(
                     Transaction,
-                    {id: transactionId},
-                    {status: TransactionStatus.SUCCESS}
+                    { id: transactionId },
+                    { status: TransactionStatus.SUCCESS }
                 );
 
                 if (payment.type === TransactionType.BOOKING_DEPOSIT) {
@@ -292,14 +327,14 @@ export default class Payment extends BaseService {
                     // Update escrow to PAID
                     await manager.update(
                         Escrow,
-                        {id: escrow.id},
-                        {status: EscrowStatus.PAID}
+                        { id: escrow.id },
+                        { status: EscrowStatus.PAID }
                     );
 
                     // Find or create professional's wallet
                     const wallet = await manager.findOne(Wallet, {
-                        where: {professionalId: escrow.booking.professionalId},
-                        lock: {mode: "pessimistic_write"}
+                        where: { professionalId: escrow.booking.professionalId },
+                        lock: { mode: "pessimistic_write" }
                     });
 
                     if (!wallet) {
@@ -313,7 +348,7 @@ export default class Payment extends BaseService {
                     // Update wallet balances
                     await manager.update(
                         Wallet,
-                        {id: wallet.id},
+                        { id: wallet.id },
                         {
                             pendingAmount: newPendingAmount,
                             totalBalance: newTotalBalance,
@@ -359,9 +394,9 @@ export default class Payment extends BaseService {
                 const disputeRepo = manager.getRepository(Dispute);
 
                 const transaction = await transactionRepo.findOne({
-                    where: {reference: reference, status: TransactionStatus.SUCCESS},
+                    where: { reference: reference, status: TransactionStatus.SUCCESS },
                     relations: ['escrow', 'escrow.booking', 'wallet'],
-                    lock: {mode: 'pessimistic_write'},
+                    lock: { mode: 'pessimistic_write' },
                 });
 
                 if (!transaction) {
@@ -386,7 +421,7 @@ export default class Payment extends BaseService {
                         escrowId: escrow.id,
                         type: TransactionType.DISPUTE,
                     },
-                    lock: {mode: 'pessimistic_read'},
+                    lock: { mode: 'pessimistic_read' },
                 });
 
                 if (existingDispute) {
@@ -441,7 +476,7 @@ export default class Payment extends BaseService {
                     userId: result.professionalId,
                     userType: UserType.PROFESSIONAL,
                     type: NotificationType.CANCEL_BOOKING,
-                    data: {...result, professional: undefined}
+                    data: { ...result, professional: undefined }
                 });
             } else {
                 logger.error("Dispute transaction failed")
@@ -455,7 +490,7 @@ export default class Payment extends BaseService {
     public async refundBooking(bookingId: string, userId: string) {
         try {
             const booking = await this.bookingRepo.findOne({
-                where: {id: bookingId, userId},
+                where: { id: bookingId, userId },
                 relations: ["escrow"],
             });
 
@@ -522,7 +557,7 @@ export default class Payment extends BaseService {
                     userId: booking.professionalId,
                     userType: UserType.PROFESSIONAL,
                     type: NotificationType.DISPUTED,
-                    data: {...booking, professional: undefined}
+                    data: { ...booking, professional: undefined }
                 });
 
                 return this.responseData(200, false, "Refund was initiated successfully", response.data.data);
@@ -544,7 +579,7 @@ export default class Payment extends BaseService {
                         type: TransactionType.REFUND,
                     },
                     relations: ["escrow", "escrow.booking", "escrow.booking.professional"],
-                    lock: {mode: "pessimistic_write"},
+                    lock: { mode: "pessimistic_write" },
                 });
 
                 if (!refundTx || refundTx.status === TransactionStatus.SUCCESS) {
@@ -566,8 +601,8 @@ export default class Payment extends BaseService {
                 }
 
                 const wallet = await manager.findOne(Wallet, {
-                    where: {professionalId: escrow.booking.professionalId},
-                    lock: {mode: "pessimistic_write"},
+                    where: { professionalId: escrow.booking.professionalId },
+                    lock: { mode: "pessimistic_write" },
                 });
 
                 if (!wallet) throw new Error("Wallet not found");
@@ -608,7 +643,7 @@ export default class Payment extends BaseService {
                         type: TransactionType.REFUND,
                     },
                     relations: ["escrow", "escrow.booking", "escrow.booking.user"],
-                    lock: {mode: "pessimistic_write"},
+                    lock: { mode: "pessimistic_write" },
                 });
 
                 if (!refundTx || refundTx.status === TransactionStatus.SUCCESS) {
@@ -662,7 +697,7 @@ export default class Payment extends BaseService {
         const event = JSON.parse(payload.toString());
         const data = event.data;
 
-        let queuePayload = {data};
+        let queuePayload = { data };
         let queueName = QueueNames.PAYMENT;
         let eventType;
 
@@ -691,7 +726,7 @@ export default class Payment extends BaseService {
                 eventType = QueueEvents.PAYMENT_REFUND_SUCCESSFUL
                 await RabbitMQ.publishToExchange(queueName, eventType, {
                     eventType: eventType,
-                    payload: {reference: data.transaction_reference},
+                    payload: { reference: data.transaction_reference },
                 });
                 break;
 
@@ -699,7 +734,7 @@ export default class Payment extends BaseService {
                 eventType = QueueEvents.PAYMENT_REFUND_FAILED
                 await RabbitMQ.publishToExchange(queueName, eventType, {
                     eventType: eventType,
-                    payload: {reference: data.transaction_reference},
+                    payload: { reference: data.transaction_reference },
                 });
                 break;
             case 'subscription.create':
@@ -727,7 +762,7 @@ export default class Payment extends BaseService {
             // 1. Get user data (you'll implement this according to your DB)
             // const user = await this.proRepo.findOne({where: {id: userId}, relations: ["account"]});
             const account = await this.accountRepo.findOne({
-                where: {id: accountId, professionalId: userId},
+                where: { id: accountId, professionalId: userId },
                 relations: ["professional", "professional.wallet"]
             });
 
@@ -840,7 +875,7 @@ export default class Payment extends BaseService {
     async verifyBookingTransaction(bookingId: string, userId: string) {
         try {
             const booking = await this.bookingRepo.findOne({
-                where: {id: bookingId, userId},
+                where: { id: bookingId, userId },
                 relations: ["escrow", "user"]
             });
 
@@ -871,8 +906,8 @@ export default class Payment extends BaseService {
                 }
             );
 
-            const {data} = response.data;
-            return this.responseData(200, false, "Booking transaction has been verified", {status: data.status});
+            const { data } = response.data;
+            return this.responseData(200, false, "Booking transaction has been verified", { status: data.status });
         } catch (error) {
             logger.error(error);
             return this.handleTypeormError(error);
