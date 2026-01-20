@@ -1,16 +1,16 @@
-import {AppDataSource} from "../data-source";
+import { AppDataSource } from "../data-source";
 import ChatEntity from "../entities/ChatEntity";
 import Service from "./Service";
-import {Professional} from "../entities/Professional";
-import {User} from "../entities/User";
+import { Professional } from "../entities/Professional";
+import { User } from "../entities/User";
 import ChatParticipant from "../entities/ChatParticipant";
-import {CdnFolders, QueueEvents, QueueNames, ResourceType, UserType} from "../types/constants";
-import Message, {MessageType} from "../entities/MessageEntity";
+import { CdnFolders, QueueEvents, QueueNames, ResourceType, UserType } from "../types/constants";
+import Message, { MessageType } from "../entities/MessageEntity";
 import deleteFiles from "../utils/deleteFiles";
 import Cloudinary from "./Cloudinary";
-import {FailedFiles, UploadedFiles} from "../types";
+import { FailedFiles, UploadedFiles } from "../types";
 import MessageAttachment from "../entities/MessageAttachment";
-import {RabbitMQ} from "./RabbitMQ";
+import { RabbitMQ } from "./RabbitMQ";
 
 
 class TransactionError extends Error {
@@ -111,10 +111,10 @@ export default class Chat extends Service {
         try {
             let where = {}
 
-            if (receiverType == UserType.PROFESSIONAL) where = {professional: {id: receiverId}, user: {id: senderId}};
-            if (receiverType == UserType.USER) where = {user: {id: receiverId}, professional: {id: senderId}};
+            if (receiverType == UserType.PROFESSIONAL) where = { professional: { id: receiverId }, user: { id: senderId } };
+            if (receiverType == UserType.USER) where = { user: { id: receiverId }, professional: { id: senderId } };
 
-            const chatParticipant = await this.chatParticipantsRepo.findOne({where, relations: ["chat"]});
+            const chatParticipant = await this.chatParticipantsRepo.findOne({ where, relations: ["chat"] });
 
             if (!chatParticipant) return this.responseData(400, true, "Chat does not exist,create a chat first");
 
@@ -163,7 +163,7 @@ export default class Chat extends Service {
             if (createdMessage) {
                 await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_RECEIVE_ATTACHMENT, {
                     eventType: QueueEvents.CHAT_RECEIVE_ATTACHMENT,
-                    payload: {newMessage, receiverId, receiverType, senderId},
+                    payload: { newMessage, receiverId, receiverType, senderId },
                 });
             }
             return this.responseData(201, false, "Attachments created successfully", createdMessage);
@@ -179,21 +179,37 @@ export default class Chat extends Service {
     public async createChat(userId: string, professionalId: string) {
         try {
             const data = await AppDataSource.transaction(async (manager) => {
-                const professional = await manager.findOne(Professional, {where: {id: professionalId}});
+                const professional = await manager.findOne(Professional, { where: { id: professionalId } });
                 if (!professional) throw new TransactionError("Professional not found");
 
-                const user = await manager.findOne(User, {where: {id: userId}});
+                const user = await manager.findOne(User, { where: { id: userId } });
                 if (!user) throw new TransactionError("User not found");
-                const chatExists = await manager.findOne(ChatParticipant, {
-                    where: [
-                        {
-                            professionalId: professional.id,
-                        },
-                        {
-                            userId: professional.id,
-                        },
-                    ],
-                });
+                // const chatExists = await manager.findOne(ChatParticipant, {
+                //     where: [
+                //         {
+                //             professionalId: professional.id,
+                //         },
+                //         {
+                //             userId: professional.id,
+                //         },
+                //     ],
+                // });
+
+                const chatExists = await manager
+                    .createQueryBuilder(ChatParticipant, "cp")
+                    .innerJoin(
+                        ChatParticipant,
+                        "cp2",
+                        "cp.chatId = cp2.chatId"
+                    )
+                    .where("cp.professionalId = :professionalId", {
+                        professionalId: professional.id,
+                    })
+                    .andWhere("cp2.userId = :userId", {
+                        userId: user.id,
+                    })
+                    .getOne();
+                    
                 if (chatExists) throw new TransactionError("Chat already exists");
 
                 const newChat = manager.create(ChatEntity, {});
@@ -201,18 +217,18 @@ export default class Chat extends Service {
 
                 const participants = manager.create(ChatParticipant, [
                     {
-                        user: {id: user.id},
-                        chat: {id: newChat.id}
+                        user: { id: user.id },
+                        chat: { id: newChat.id }
                     },
                     {
-                        professional: {id: professional.id},
-                        chat: {id: newChat.id}
+                        professional: { id: professional.id },
+                        chat: { id: newChat.id }
                     }
                 ]);
 
                 await manager.save(participants);
 
-                return {chat, user, professional};
+                return { chat, user, professional };
             });
 
             return this.responseData(201, false, "Chat has been created successfully.", data);
@@ -325,7 +341,7 @@ export default class Chat extends Service {
                     userType === UserType.PROFESSIONAL
                         ? "participant.professionalId = :userId"
                         : "participant.userId = :userId",
-                    {userId}
+                    { userId }
                 )
                 .groupBy("chat.id")
                 .orderBy("latestMessageAt", "DESC")
@@ -374,12 +390,12 @@ export default class Chat extends Service {
                 .createQueryBuilder("message")
                 .innerJoin("message.chat", "chat")
                 .innerJoin("chat.participants", "participant")
-                .where("chat.id = :chatId", {chatId})
+                .where("chat.id = :chatId", { chatId })
                 .andWhere(
                     userType === UserType.PROFESSIONAL
                         ? "participant.professionalId = :userId"
                         : "participant.userId = :userId",
-                    {userId}
+                    { userId }
                 );
 
             // Total messages count for pagination
@@ -408,7 +424,7 @@ export default class Chat extends Service {
             const records = await this.messageRepo
                 .createQueryBuilder("message")
                 .leftJoinAndSelect("message.attachments", "attachments")
-                .where("message.id IN (:...ids)", {ids: messageIds})
+                .where("message.id IN (:...ids)", { ids: messageIds })
                 .orderBy("message.createdAt", "DESC")
                 .getMany();
 
@@ -433,12 +449,12 @@ export default class Chat extends Service {
                 .leftJoin("message.chat", "chat")
                 .leftJoin("message.attachments", "attachments")
                 .leftJoin("chat.participants", "participant")
-                .where("chat.id = :chatId", {chatId})
+                .where("chat.id = :chatId", { chatId })
                 .andWhere(
                     userType === UserType.PROFESSIONAL
                         ? "participant.professionalId = :userId"
                         : "participant.userId = :userId",
-                    {userId}
+                    { userId }
                 )
                 .orderBy("message.createdAt", "DESC")
                 .skip(skip)
